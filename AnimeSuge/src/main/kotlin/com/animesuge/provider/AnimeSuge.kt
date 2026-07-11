@@ -1,4 +1,4 @@
-﻿package com.animesuge.provider
+package com.animesuge.provider
 
 import android.util.Base64
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -102,7 +102,8 @@ class AnimeSuge : MainAPI() {
 
     // ── Home page ────────────────────────────────────────────────────────────
 
-    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {         }
+    override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+        // showTelegramPopup()  // ← Commented out - popup disabled
         val url = request.data + if (page > 1) "?page=$page" else ""
         val doc = app.get(url).document
         val items = doc.select("div.item").mapNotNull { it.toSearchResult() }
@@ -124,7 +125,7 @@ class AnimeSuge : MainAPI() {
 
     // ── Search ───────────────────────────────────────────────────────────────
 
-    override suspend fun search(query: String): List<SearchResponse> {        if 
+    override suspend fun search(query: String): List<SearchResponse> {
         val encoded = URLEncoder.encode(query, "UTF-8")
         return app.get("$mainUrl/filter?keyword=$encoded").document
             .select("div.item").mapNotNull { it.toSearchResult() }.distinctBy { it.url }
@@ -196,15 +197,6 @@ class AnimeSuge : MainAPI() {
 
     // ── Load Links ───────────────────────────────────────────────────────────
 
-    /**
-     * data format: "{animeUrl}|{dataId}|{epNum}|{dataIds}|{sub|dub}"
-     *
-     * Flow:
-     *   1. GET /ajax/server/list?servers={dataIds}  → HTML of server buttons
-     *   2. Filter .server-type[data-type=sub|dub] → get each .server[data-link-id]
-     *   3. GET /ajax/server?get={linkId}            → JSON with result.url (player embed URL)
-     *   4. loadExtractor(playerUrl) or handle megaplay clones directly
-     */
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -216,9 +208,8 @@ class AnimeSuge : MainAPI() {
         if (parts.size < 5) return false
 
         val animeUrl     = parts[0]
-        // parts[1] = dataId, parts[2] = epNum — not needed beyond here
         val dataIds      = parts[3]
-        val selectedType = parts[4] // "sub" or "dub"
+        val selectedType = parts[4]
 
         // 1. Get server list
         val serverListText = app.get(
@@ -233,7 +224,7 @@ class AnimeSuge : MainAPI() {
         val serverListSoup = Jsoup.parse(serverListHtml)
 
         // 2. Collect matching server link IDs
-        val serversToLoad = mutableListOf<Pair<String, String>>() // (serverName, linkId)
+        val serversToLoad = mutableListOf<Pair<String, String>>()
         serverListSoup.select(".server-type").forEach { st ->
             val typeAttr = st.attr("data-type")
             val isMatch = if (selectedType == "sub") {
@@ -293,120 +284,15 @@ class AnimeSuge : MainAPI() {
         @JsonProperty("url") val url: String? = null
     )
 
-   
+    // ── Disabled Ad Functions ──────────────────────────────────────────────
 
     private fun showTelegramPopup() {
-        if (isLayout(TV)) return
-        val ctx = context ?: return
-        if (telegramPopupShown) return
-        val prefs = ctx.getSharedPreferences("cncverse_prefs", android.content.Context.MODE_PRIVATE)
-        if (prefs.getBoolean("telegram_popup_shown", false)) { telegramPopupShown = true; return }
-        telegramPopupShown = true
-        prefs.edit().putBoolean("telegram_popup_shown", true).apply()
-        Handler(Looper.getMainLooper()).post {
-            try {
-                val dp = ctx.resources.displayMetrics.density
-
-                val bgDraw = android.graphics.drawable.GradientDrawable().apply {
-                    setColor(android.graphics.Color.parseColor("#1A1A2E"))
-                    cornerRadius = 16f * dp
-                }
-
-                val root = android.widget.LinearLayout(ctx).apply {
-                    orientation = android.widget.LinearLayout.VERTICAL
-                    setPadding((24 * dp).toInt(), (20 * dp).toInt(), (24 * dp).toInt(), (16 * dp).toInt())
-                    background = bgDraw
-                }
-
-                val titleTv = android.widget.TextView(ctx).apply {
-                    text = "\uD83D\uDCAC Join CNCVerse Community"
-                    setTextColor(android.graphics.Color.WHITE)
-                    textSize = 17f
-                    typeface = android.graphics.Typeface.DEFAULT_BOLD
-                    layoutParams = android.widget.LinearLayout.LayoutParams(-1, -2)
-                        .also { it.bottomMargin = (10 * dp).toInt() }
-                }
-
-                val dividerV = android.view.View(ctx).apply {
-                    setBackgroundColor(android.graphics.Color.parseColor("#2D2D4A"))
-                    layoutParams = android.widget.LinearLayout.LayoutParams(-1, 1)
-                        .also { it.bottomMargin = (14 * dp).toInt() }
-                }
-
-                val msgTv = android.widget.TextView(ctx).apply {
-                    text = "Join our Telegram group to discuss and share your opinion!"
-                    setTextColor(android.graphics.Color.parseColor("#A0A0A8"))
-                    textSize = 14f
-                    setLineSpacing(0f, 1.4f)
-                    layoutParams = android.widget.LinearLayout.LayoutParams(-1, -2)
-                        .also { it.bottomMargin = (18 * dp).toInt() }
-                }
-
-                val btnRow = android.widget.LinearLayout(ctx).apply {
-                    orientation = android.widget.LinearLayout.HORIZONTAL
-                    gravity = android.view.Gravity.END
-                }
-                val laterTv = android.widget.TextView(ctx).apply {
-                    text = "Later"
-                    setTextColor(android.graphics.Color.parseColor("#808090"))
-                    textSize = 14f
-                    val p = (10 * dp).toInt()
-                    setPadding(p, p, p, p)
-                    isClickable = true; isFocusable = true
-                }
-                val joinTv = android.widget.TextView(ctx).apply {
-                    text = "Join Telegram"
-                    setTextColor(android.graphics.Color.parseColor("#5B9BF5"))
-                    textSize = 14f
-                    typeface = android.graphics.Typeface.DEFAULT_BOLD
-                    val p = (10 * dp).toInt()
-                    setPadding(p, p, 0, p)
-                    isClickable = true; isFocusable = true
-                }
-                btnRow.addView(laterTv)
-                btnRow.addView(joinTv)
-                root.addView(titleTv)
-                root.addView(dividerV)
-                root.addView(msgTv)
-                root.addView(btnRow)
-
-                val dialog = android.app.AlertDialog.Builder(ctx)
-                    .setView(root)
-                    .setCancelable(true)
-                    .create()
-
-                dialog.window?.setBackgroundDrawable(
-                    android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT)
-                )
-
-                laterTv.setOnClickListener { dialog.dismiss() }
-                joinTv.setOnClickListener {
-                    dialog.dismiss()
-                    try {
-                        val i = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://t.me/cncverse"))
-                        i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                        ctx.startActivity(i)
-                    } catch (_: Exception) {}
-                }
-                dialog.show()
-            } catch (_: Exception) {}
-        }
+        // Completely disabled - does nothing
+        return
     }
 
     private fun openInExternalBrowser(url: String) {
-        if (isLayout(TV)) return
-        val ctx = context ?: return
-        val now = System.currentTimeMillis()
-        if (now - lastBrowserOpenMs < BROWSER_DEBOUNCE_MS) return
-        lastBrowserOpenMs = now
-        Handler(Looper.getMainLooper()).post {
-            try {
-                ctx.startActivity(
-                    Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                )
-            } catch (e: Exception) { }
-        }
+        // Completely disabled - does nothing
+        return
     }
 }
