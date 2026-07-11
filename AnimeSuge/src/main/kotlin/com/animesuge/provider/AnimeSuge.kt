@@ -7,21 +7,11 @@ import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 import org.jsoup.Jsoup
 import java.net.URLEncoder
-import android.content.Intent
-import android.net.Uri
-import android.os.Handler
-import android.os.Looper
-import com.lagradost.cloudstream3.ui.settings.Globals.TV
-import com.lagradost.cloudstream3.ui.settings.Globals.isLayout
 
 class AnimeSuge : MainAPI() {
     companion object {
         var context: android.content.Context? = null
         private const val OMG10 = "aHR0cHM6Ly9vbWcxMC5jb20vNC8xMTEwNDQ4OQ=="
-        @Volatile private var lastBrowserOpenMs = 0L
-        @Volatile private var telegramPopupShown = false
-        @Volatile private var subscriptionPopupShown = false
-        private const val BROWSER_DEBOUNCE_MS = 10_000L
     }
 
     override var mainUrl = "https://animesuge.cz"
@@ -93,17 +83,12 @@ class AnimeSuge : MainAPI() {
         return rot13(b64Shifted)
     }
 
-    // ── Common request headers ───────────────────────────────────────────────
-
     private val ajaxHeaders = mapOf(
         "X-Requested-With" to "XMLHttpRequest",
         "Referer"          to "$mainUrl/"
     )
 
-    // ── Home page ────────────────────────────────────────────────────────────
-
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
-        // showTelegramPopup()  // ← Commented out - popup disabled
         val url = request.data + if (page > 1) "?page=$page" else ""
         val doc = app.get(url).document
         val items = doc.select("div.item").mapNotNull { it.toSearchResult() }
@@ -123,21 +108,16 @@ class AnimeSuge : MainAPI() {
         return newAnimeSearchResponse(title, href) { this.posterUrl = poster }
     }
 
-    // ── Search ───────────────────────────────────────────────────────────────
-
     override suspend fun search(query: String): List<SearchResponse> {
         val encoded = URLEncoder.encode(query, "UTF-8")
         return app.get("$mainUrl/filter?keyword=$encoded").document
             .select("div.item").mapNotNull { it.toSearchResult() }.distinctBy { it.url }
     }
 
-    // ── Load (detail page) ───────────────────────────────────────────────────
-
     override suspend fun load(url: String): LoadResponse? {
         val animeUrl = url.replace(Regex("/ep-\\d+$"), "")
         val doc = app.get(animeUrl).document
 
-        // Anime ID — from .watch-wrap[data-id] OR inline script mangaId
         val dataId = doc.selectFirst(".watch-wrap[data-id]")?.attr("data-id")
             ?: Regex("""mangaId\s*=\s*(\d+)""").find(doc.html())?.groupValues?.get(1)
             ?: return null
@@ -157,7 +137,6 @@ class AnimeSuge : MainAPI() {
         val genres = doc.select(".meta a[href*='/genre/'], .data a[href*='/genre/']")
             .map { it.text().trim() }
 
-        // Fetch episode list with VRF
         val vrf = generateVrf(dataId)
         val epsText = app.get(
             "$mainUrl/ajax/episode/list/$dataId?vrf=$vrf",
@@ -195,8 +174,6 @@ class AnimeSuge : MainAPI() {
         }
     }
 
-    // ── Load Links ───────────────────────────────────────────────────────────
-
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -211,7 +188,6 @@ class AnimeSuge : MainAPI() {
         val dataIds      = parts[3]
         val selectedType = parts[4]
 
-        // 1. Get server list
         val serverListText = app.get(
             "$mainUrl/ajax/server/list?servers=$dataIds",
             headers = mapOf(
@@ -223,7 +199,6 @@ class AnimeSuge : MainAPI() {
         val serverListHtml = serverListJson.result ?: return false
         val serverListSoup = Jsoup.parse(serverListHtml)
 
-        // 2. Collect matching server link IDs
         val serversToLoad = mutableListOf<Pair<String, String>>()
         serverListSoup.select(".server-type").forEach { st ->
             val typeAttr = st.attr("data-type")
@@ -241,10 +216,8 @@ class AnimeSuge : MainAPI() {
         }
 
         if (serversToLoad.isEmpty()) return false
-
         var found = false
 
-        // 3. For each server, resolve the player URL then extract
         serversToLoad.forEach { (serverName, linkId) ->
             try {
                 val serverInfoText = app.get(
@@ -261,14 +234,10 @@ class AnimeSuge : MainAPI() {
                 val loaded = loadExtractor(playerUrl, "$mainUrl/", subtitleCallback, callback)
                 if (loaded) found = true
             } catch (e: Exception) {
-                // skip this server and try the next
             }
         }
-
         return found
     }
-
-    // ── Data classes ─────────────────────────────────────────────────────────
 
     data class AjaxResponse(
         @JsonProperty("status") val status: Int?    = null,
@@ -283,16 +252,4 @@ class AnimeSuge : MainAPI() {
     data class ServerInfoResult(
         @JsonProperty("url") val url: String? = null
     )
-
-    // ── Disabled Ad Functions ──────────────────────────────────────────────
-
-    private fun showTelegramPopup() {
-        // Completely disabled - does nothing
-        return
-    }
-
-    private fun openInExternalBrowser(url: String) {
-        // Completely disabled - does nothing
-        return
-    }
 }
