@@ -1,10 +1,6 @@
 package com.horis.cncverse
 
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
-import android.os.Handler
-import android.os.Looper
 import com.horis.cncverse.entities.EpisodesData
 import com.horis.cncverse.entities.PostData
 import com.horis.cncverse.entities.SearchData
@@ -17,10 +13,14 @@ import okhttp3.Interceptor
 import okhttp3.Response
 import org.jsoup.nodes.Element
 import com.lagradost.cloudstream3.APIHolder.unixTime
+import android.content.Intent
+import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import com.lagradost.cloudstream3.ui.settings.Globals.TV
 import com.lagradost.cloudstream3.ui.settings.Globals.isLayout
 
-class NetflixMirrorProvider : MainAPI() {
+class PrimeVideoMirrorProvider : MainAPI() {
     companion object {
         var context: Context? = null
         private const val OMG10 = "aHR0cHM6Ly9vbWcxMC5jb20vNC8xMTEwNDQ4OQ=="
@@ -38,7 +38,7 @@ class NetflixMirrorProvider : MainAPI() {
     override var lang = "ta"
 
     override var mainUrl = "https://net52.cc"
-    override var name = "Netflix"
+    override var name = "Prime Video"
 
     override val hasMainPage = true
     private var cookie_value = ""
@@ -66,7 +66,7 @@ class NetflixMirrorProvider : MainAPI() {
         cookie_value = if(cookie_value.isEmpty()) bypass(mainUrl) else cookie_value
         val cookies = mapOf(
             "t_hash_t" to cookie_value,
-            "ott" to "nf",
+            "ott" to "pv",
             "hd" to "on"
         )
         val document = app.get(
@@ -95,7 +95,7 @@ class NetflixMirrorProvider : MainAPI() {
         //     fixUrlNull(selectFirst(".card-img-container img, .top10-img img")?.attr("data-src"))
 
         return newAnimeSearchResponse("", Id(id).toJson()) {
-            this.posterUrl = "https://imgcdn.kim/poster/v/$id.jpg"
+            this.posterUrl = "https://imgcdn.kim/pv/v/$id.jpg"
             posterHeaders = mapOf("Referer" to "$mainUrl/home")
         }
     }
@@ -106,29 +106,30 @@ class NetflixMirrorProvider : MainAPI() {
         val cookies = mapOf(
             "t_hash_t" to cookie_value,
             "hd" to "on",
-            "ott" to "nf"
+            "ott" to "pv"
         )
-        val url = "$mainUrl/mobile/search.php?s=$query&t=${APIHolder.unixTime}"
+        val url = "$mainUrl/mobile/pv/search.php?s=$query&t=${APIHolder.unixTime}"
         val data = app.get(url, referer = "$mainUrl/home", cookies = cookies).parsed<SearchData>()
 
         return data.searchResult.map {
             newAnimeSearchResponse(it.t, Id(it.id).toJson()) {
-                posterUrl = "https://imgcdn.kim/poster/v/${it.id}.jpg"
+                posterUrl = "https://imgcdn.kim/pv/v/${it.id}.jpg"
                 posterHeaders = mapOf("Referer" to "$mainUrl/home")
             }
         }
     }
 
     override suspend fun load(url: String): LoadResponse? {
+        
         cookie_value = if(cookie_value.isEmpty()) bypass(mainUrl) else cookie_value
         val id = parseJson<Id>(url).id
         val cookies = mapOf(
             "t_hash_t" to cookie_value,
             "hd" to "on",
-            "ott" to "nf"
+            "ott" to "pv"
         )
         val data = app.get(
-            "$mainUrl/mobile/post.php?id=$id&t=${APIHolder.unixTime}",
+            "$mainUrl/mobile/pv/post.php?id=$id&t=${APIHolder.unixTime}",
             headers,
             referer = "$mainUrl/home",
             cookies = cookies
@@ -152,7 +153,7 @@ class NetflixMirrorProvider : MainAPI() {
 
         val suggest = data.suggest?.map {
             newAnimeSearchResponse("", Id(it.id).toJson()) {
-                this.posterUrl = "https://imgcdn.kim/poster/v/${it.id}.jpg"
+                this.posterUrl = "https://imgcdn.kim/pv/v/${it.id}.jpg"
                 posterHeaders = mapOf("Referer" to "$mainUrl/home")
             }
         }
@@ -167,7 +168,7 @@ class NetflixMirrorProvider : MainAPI() {
                     this.name = it.t
                     this.episode = it.ep.replace("E", "").toIntOrNull()
                     this.season = it.s.replace("S", "").toIntOrNull()
-                    this.posterUrl = "https://imgcdn.kim/poster/v/150/${it.id}.jpg"
+                    this.posterUrl = "https://imgcdn.kim/pvepimg/${it.id}.jpg"
                     this.runTime = it.time.replace("m", "").toIntOrNull()
                 }
             }
@@ -184,8 +185,8 @@ class NetflixMirrorProvider : MainAPI() {
         val type = if (data.episodes.first() == null) TvType.Movie else TvType.TvSeries
 
         return newTvSeriesLoadResponse(title, url, type, episodes) {
-            posterUrl = "https://imgcdn.kim/poster/v/$id.jpg"
-            backgroundPosterUrl = "https://imgcdn.kim/poster/v/$id.jpg"
+            posterUrl = "https://imgcdn.kim/pv/v/$id.jpg"
+            backgroundPosterUrl = "https://imgcdn.kim/pv/h/$id.jpg"
             posterHeaders = mapOf("Referer" to "$mainUrl/home")
             plot = data.desc
             year = data.year.toIntOrNull()
@@ -205,12 +206,12 @@ class NetflixMirrorProvider : MainAPI() {
         val cookies = mapOf(
             "t_hash_t" to cookie_value,
             "hd" to "on",
-            "ott" to "nf"
+            "ott" to "pv"
         )
         var pg = page
         while (true) {
             val data = app.get(
-                "$mainUrl/mobile/episodes.php?s=$sid&series=$eid&t=${APIHolder.unixTime}&page=$pg",
+                "$mainUrl/mobile/pv/episodes.php?s=$sid&series=$eid&t=${APIHolder.unixTime}&page=$pg",
                 headers,
                 referer = "$mainUrl/home",
                 cookies = cookies
@@ -220,7 +221,7 @@ class NetflixMirrorProvider : MainAPI() {
                     name = it.t
                     episode = it.ep.replace("E", "").toIntOrNull()
                     season = it.s.replace("S", "").toIntOrNull()
-                    this.posterUrl = "https://imgcdn.kim/epimg/150/${it.id}.jpg"
+                    this.posterUrl = "https://imgcdn.kim/pvepimg/${it.id}.jpg"
                     this.runTime = it.time.replace("m", "").toIntOrNull()
                 }
             }
@@ -229,10 +230,6 @@ class NetflixMirrorProvider : MainAPI() {
         }
         return episodes
     }
-
-
-
-    
 
     override suspend fun loadLinks(
         data: String,
@@ -244,7 +241,7 @@ class NetflixMirrorProvider : MainAPI() {
         val id = parseJson<LoadData>(data).id
         val response = app.get(
             "$apiBase/newtv/player.php?id=$id",
-            headers = buildNewTvHeaders("nf", mapOf("Usertoken" to ""))
+            headers = buildNewTvHeaders("pv", mapOf("Usertoken" to ""))
         ).parsed<NewTvPlayerResponse>()
 
         if (response.status != "ok" || response.video_link.isNullOrBlank()) return false
@@ -281,4 +278,8 @@ class NetflixMirrorProvider : MainAPI() {
     data class LoadData(
         val title: String, val id: String
     )
+
+
+
+    
 }
