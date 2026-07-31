@@ -5,7 +5,7 @@ import com.lagradost.cloudstream3.utils.*
 
 class LiveProvider : MainAPI() {
     override var mainUrl = "https://owrcovcrpy.gpcdn.net"
-    override var name = "My Live TV"
+    override var name = "Live TV"
     override var lang = "en"
     override val hasMainPage = true
     override val supportedTypes = setOf(TvType.Live)
@@ -14,19 +14,16 @@ class LiveProvider : MainAPI() {
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
-        // Directly add the channel to the main page
-        val channel = newLiveSearchResponse(
-            name = "My Channel",
-            url = "https://owrcovcrpy.gpcdn.net/bpk-tv/1706/output/1706.m3u8",
-            tvType = TvType.Live
-        )
-
         return newHomePageResponse(
             listOf(
                 HomePageList(
                     "Channels",
-                    listOf(channel),
-                    true
+                    listOf(
+                        newLiveSearchResponse(
+                            "My Channel",
+                            "https://owrcovcrpy.gpcdn.net/bpk-tv/1706/output/1706.m3u8"
+                        )
+                    )
                 )
             )
         )
@@ -34,24 +31,14 @@ class LiveProvider : MainAPI() {
 
     override suspend fun load(url: String): LoadResponse? {
         return newLiveStreamLoadResponse(
-            name = "Live Channel",
-            dataUrl = url,
-            loadLinks = { _, _, _, callback ->
-                callback(
-                    ExtractorLink(
-                        source = name,
-                        name = "Source",
-                        url = url,
-                        type = ExtractorLinkType.M3U8,
-                        quality = "Auto"
-                    )
-                )
+            name = "Live",
+            url = url,
+            loadLinks = { cb ->
+                cb(newExtractorLink(name, "Source", url, ExtractorLinkType.M3U8, QUALITY_AUTO))
                 true
             }
         )
     }
 
-    override suspend fun search(query: String): List<SearchResponse> {
-        return emptyList()
-    }
+    override suspend fun search(query: String): List<SearchResponse> = emptyList()
 }
