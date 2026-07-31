@@ -1,19 +1,17 @@
-package com.phisher98.cloudplay
+package com.cncverse
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 
-class SimpleLiveProvider : MainAPI() {
+class LiveProvider : MainAPI() {
     override var mainUrl = "https://raw.githubusercontent.com"
-    override var name = "Simple Live TV"
+    override var name = "Live TV"
     override var lang = "en"
     override val hasMainPage = true
     override val supportedTypes = setOf(TvType.Live)
 
-    // Your M3U8 sources
     private val m3uSources = listOf(
         "https://raw.githubusercontent.com/drmlive/fancode-live-events/main/fancode.m3u"
-        // Add more M3U URLs here later
     )
 
     private val headers = mapOf(
@@ -57,21 +55,17 @@ class SimpleLiveProvider : MainAPI() {
             val trimmed = line.trim()
             when {
                 trimmed.startsWith("#EXTINF:") -> {
-                    // Extract name
                     currentName = trimmed.substringAfter(",").trim()
-                    
-                    // Extract logo if available
                     val logoMatch = Regex("tvg-logo=\"([^\"]+)\"").find(trimmed)
                     currentLogo = logoMatch?.groupValues?.get(1) ?: ""
                 }
                 trimmed.isNotBlank() && !trimmed.startsWith("#") -> {
-                    // This is a URL
                     if (currentName.isNotBlank()) {
                         channels.add(
                             newLiveSearchResponse(
-                                currentName,
-                                trimmed,
-                                TvType.Live,
+                                name = currentName,
+                                url = trimmed,
+                                tvType = TvType.Live,
                                 posterUrl = currentLogo
                             )
                         )
@@ -85,32 +79,39 @@ class SimpleLiveProvider : MainAPI() {
         return channels
     }
 
-    override suspend fun load(
-        url: String,
-        completion: suspend (LoadResponse) -> Unit
-    ): LoadResponse? {
+    override suspend fun load(url: String): LoadResponse? {
         return newLiveStreamLoadResponse(
-            title = "Live Channel",
-            url = url,
-            data = url,
+            name = "Live Channel",
+            dataUrl = url,
             loadLinks = { data, isCasting, subtitleCallback, callback ->
-                callback.invoke(
-                    newExtractorLink(
-                        name = "Source",
-                        url = data,
-                        type = ExtractorLinkType.M3U8,
-                        headers = mapOf(
-                            "User-Agent" to "okhttp/4.12.0"
-                        )
-                    )
-                )
-                true
+                loadStreamLinks(data, callback)
             }
         )
     }
 
+    private suspend fun loadStreamLinks(
+        url: String,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+        try {
+            val link = ExtractorLink(
+                source = name,
+                name = "Source",
+                url = url,
+                type = ExtractorLinkType.M3U8,
+                quality = "Auto",
+                headers = mapOf(
+                    "User-Agent" to "okhttp/4.12.0"
+                )
+            )
+            callback(link)
+            return true
+        } catch (e: Exception) {
+            return false
+        }
+    }
+
     override suspend fun search(query: String): List<SearchResponse> {
-        // Simple search - just return empty for now
         return emptyList()
     }
 }
