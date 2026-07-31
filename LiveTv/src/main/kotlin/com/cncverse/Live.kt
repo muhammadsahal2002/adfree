@@ -34,22 +34,30 @@ class LiveProvider : MainAPI() {
         return newLiveStreamLoadResponse(
             name = "Live Channel",
             url = url,
-            loadLinks = { data, isCasting, subtitleCallback, callback ->
-                callback(
-                    newExtractorLink(
-                        source = name,
-                        name = "Source",
-                        url = data,
-                        type = ExtractorLinkType.M3U8,
-                        quality = QUALITY_AUTO,
-                        headers = mapOf(
-                            "User-Agent" to "okhttp/4.12.0"
-                        )
-                    )
+            dataUrl = url          // this string is passed to loadLinks() as `data`
+        )
+    }
+
+    override suspend fun loadLinks(
+        data: String,
+        isCasting: Boolean,
+        subtitleCallback: (SubtitleFile) -> Unit,
+        callback: (ExtractorLink) -> Unit
+    ): Boolean {
+        callback.invoke(
+            newExtractorLink(
+                source = name,
+                name = "Source",
+                url = data,
+                type = ExtractorLinkType.M3U8
+            ) {
+                this.quality = Qualities.Unknown.value   // or 0 for Auto
+                this.headers = mapOf(
+                    "User-Agent" to "okhttp/4.12.0"
                 )
-                true
             }
         )
+        return true
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
