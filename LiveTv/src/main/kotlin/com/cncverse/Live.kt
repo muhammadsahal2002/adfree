@@ -14,16 +14,17 @@ class LiveProvider : MainAPI() {
         page: Int,
         request: MainPageRequest
     ): HomePageResponse {
+        val channel = newLiveSearchResponse(
+            name = "My Channel",
+            url = "https://owrcovcrpy.gpcdn.net/bpk-tv/1706/output/1706.m3u8"
+        )
+
         return newHomePageResponse(
             listOf(
                 HomePageList(
-                    "Channels",
-                    listOf(
-                        newLiveSearchResponse(
-                            "My Channel",
-                            "https://owrcovcrpy.gpcdn.net/bpk-tv/1706/output/1706.m3u8"
-                        )
-                    )
+                    "Live Channels",
+                    listOf(channel),
+                    true
                 )
             )
         )
@@ -31,14 +32,27 @@ class LiveProvider : MainAPI() {
 
     override suspend fun load(url: String): LoadResponse? {
         return newLiveStreamLoadResponse(
-            name = "Live",
+            name = "Live Channel",
             url = url,
-            loadLinks = { cb ->
-                cb(newExtractorLink(name, "Source", url, ExtractorLinkType.M3U8, QUALITY_AUTO))
+            loadLinks = { data, isCasting, subtitleCallback, callback ->
+                callback(
+                    newExtractorLink(
+                        source = name,
+                        name = "Source",
+                        url = data,
+                        type = ExtractorLinkType.M3U8,
+                        quality = QUALITY_AUTO,
+                        headers = mapOf(
+                            "User-Agent" to "okhttp/4.12.0"
+                        )
+                    )
+                )
                 true
             }
         )
     }
 
-    override suspend fun search(query: String): List<SearchResponse> = emptyList()
+    override suspend fun search(query: String): List<SearchResponse> {
+        return emptyList()
+    }
 }
