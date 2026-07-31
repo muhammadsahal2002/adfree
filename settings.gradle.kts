@@ -1,3 +1,2 @@
 rootProject.name = "CNCVerse"
-include("AnimeSuge")
-include("CNC Verse")
+include("LiveTv")
