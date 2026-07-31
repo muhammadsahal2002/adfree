@@ -13,7 +13,7 @@ class LiveProvider : MainAPI() {
     override val supportedTypes = setOf(TvType.Live)
 
     // ← Change this to your raw GitHub JSON link
-    private val playlistUrl = "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/channels.json"
+    private val playlistUrl = "https://raw.githubusercontent.com/muhammadsahal2002/CS3/refs/heads/main/channels.json"
 
     // JSON data classes
     data class Root(
