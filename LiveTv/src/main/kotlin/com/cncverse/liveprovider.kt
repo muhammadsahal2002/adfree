@@ -1,11 +1,11 @@
-package com.phisher98.cloudplay
+package com.cncverse
 
 import com.lagradost.cloudstream3.plugins.BasePlugin
 import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
 
 @CloudstreamPlugin
-class SimpleLivePlugin : BasePlugin() {
+class LivePlugin : BasePlugin() {
     override fun load() {
-        registerMainAPI(SimpleLiveProvider())
+        registerMainAPI(LiveProvider())
     }
 }
