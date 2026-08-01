@@ -12,8 +12,8 @@ class LiveProvider : MainAPI() {
     override val hasMainPage = true
     override val supportedTypes = setOf(TvType.Live)
 
-    // Your JSON link
-    private val playlistUrl = "https://raw.githubusercontent.com/muhammadsahal2002/CS3/refs/heads/main/channels.json"
+    private val playlistUrl =
+        "https://raw.githubusercontent.com/muhammadsahal2002/CS3/refs/heads/main/channels.json"
 
     data class Root(
         @JsonProperty("categories") val categories: List<Category> = emptyList()
@@ -81,26 +81,6 @@ class LiveProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val headers = mapOf(
-            "User-Agent" to "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
-            "Accept" to "*/*",
-            "Connection" to "keep-alive"
-        )
-
-        // Better live HLS handling
-        try {
-            M3u8Helper.generateM3u8(
-                source = name,
-                streamUrl = data,
-                referer = "",
-                quality = Qualities.Unknown.value,
-                headers = headers
-            ).forEach(callback)
-        } catch (_: Exception) {
-            // fallback if M3u8Helper fails
-        }
-
-        // Direct link as backup
         callback.invoke(
             newExtractorLink(
                 source = name,
@@ -109,10 +89,14 @@ class LiveProvider : MainAPI() {
                 type = ExtractorLinkType.M3U8
             ) {
                 this.quality = Qualities.Unknown.value
-                this.headers = headers
+                this.headers = mapOf(
+                    "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    "Connection" to "keep-alive",
+                    "Accept" to "*/*"
+                )
+                this.referer = ""
             }
         )
-
         return true
     }
 
