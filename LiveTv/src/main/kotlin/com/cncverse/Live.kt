@@ -8,7 +8,7 @@ import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 class LiveProvider : MainAPI() {
     override var mainUrl = "https://raw.githubusercontent.com"
     override var name = "Live TV"
-    override var lang = "en"
+    override var lang = "bn"
     override val hasMainPage = true
     override val supportedTypes = setOf(TvType.Live)
 
