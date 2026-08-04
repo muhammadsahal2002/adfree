@@ -591,21 +591,11 @@ override suspend fun search(query: String): List<SearchResponse> {
                     val videoData = mapper.readValue<VideoResponse>(decryptedJson).data
 
                     if (videoData.videoUrl != null && videoData.permissionDenied != true) {
+                        // 🔥 FIX: Always use index.m3u8 with NO parameters
                         val originalUrl = videoData.videoUrl
-
-                        // Always strip query parameters, convert image/preview → index.m3u8
-                        val cleaned = originalUrl.substringBefore("?")
-                        val finalUrl = if (
-                            cleaned.contains("preview", ignoreCase = true) ||
-                            cleaned.endsWith(".jpg") ||
-                            cleaned.endsWith(".png") ||
-                            cleaned.endsWith(".jpeg")
-                        ) {
-                            val basePath = cleaned.substringBeforeLast("/")
-                            "$basePath/index.m3u8"
-                        } else {
-                            cleaned   // keep only up to .m3u8
-                        }
+                        val cleaned = originalUrl.substringBefore("?")  // Remove all query params
+                        val basePath = cleaned.substringBeforeLast("/")
+                        val finalUrl = "$basePath/index.m3u8"  // Just the clean M3U8 URL
 
                         callback.invoke(
                             newExtractorLink(
@@ -688,21 +678,11 @@ override suspend fun search(query: String): List<SearchResponse> {
                         val videoData = mapper.readValue<VideoResponse>(decryptedJson).data
 
                         if (videoData.videoUrl != null && videoData.permissionDenied != true) {
+                            // 🔥 FIX: Always use index.m3u8 with NO parameters
                             val originalUrl = videoData.videoUrl
-
-                            // Always strip query parameters, convert image/preview → index.m3u8
-                            val cleaned = originalUrl.substringBefore("?")
-                            val finalUrl = if (
-                                cleaned.contains("preview", ignoreCase = true) ||
-                                cleaned.endsWith(".jpg") ||
-                                cleaned.endsWith(".png") ||
-                                cleaned.endsWith(".jpeg")
-                            ) {
-                                val basePath = cleaned.substringBeforeLast("/")
-                                "$basePath/index.m3u8"
-                            } else {
-                                cleaned   // keep only up to .m3u8
-                            }
+                            val cleaned = originalUrl.substringBefore("?")  // Remove all query params
+                            val basePath = cleaned.substringBeforeLast("/")
+                            val finalUrl = "$basePath/index.m3u8"  // Just the clean M3U8 URL
 
                             callback.invoke(
                                 newExtractorLink(
@@ -754,6 +734,4 @@ override suspend fun search(query: String): List<SearchResponse> {
     } catch (e: Exception) {
         false
     }
-}
-
 }
