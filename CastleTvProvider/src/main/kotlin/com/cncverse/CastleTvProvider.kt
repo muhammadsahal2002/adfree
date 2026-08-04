@@ -721,4 +721,3 @@ override suspend fun search(query: String): List<SearchResponse> {
 }
 
 }
-}
