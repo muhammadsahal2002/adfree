@@ -1,10 +1,10 @@
 package com.cncverse
 
+import android.content.Context
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.base64DecodeArray
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.*
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
@@ -14,22 +14,28 @@ import com.fasterxml.jackson.databind.DeserializationFeature
 import java.nio.charset.StandardCharsets
 import java.time.Instant
 import java.time.ZoneId
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 
 class CastleTvProvider : MainAPI() {
+    companion object {
+        var context: Context? = null
+    }
 
     override var mainUrl = "https://api.hlowb.com"
-    override var name = "Castle TV"
+    override var name = "Castle TV (Use VLC)"
     override val hasMainPage = true
     override var lang = "ta"
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
-    // Put your real suffix here (was BuildConfig.CASTLE_SUFFIX)
-    private val keySupFixx = "T!BgJB"
+    private val keySupFixx = BuildConfig.CASTLE_SUFFIX
 
+    // Configure Jackson to ignore unknown properties
     private val mapper = jacksonObjectMapper().apply {
         configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
     }
 
+    // Data classes for API responses
     data class CastleApiResponse(
         val code: Int,
         val msg: String,
@@ -42,6 +48,7 @@ class CastleTvProvider : MainAPI() {
         val data: String
     )
 
+    // Wrapper for the decrypted response
     data class DecryptedResponse(
         val code: Int,
         val msg: String,
@@ -88,9 +95,10 @@ class CastleTvProvider : MainAPI() {
         val countdownHourNew: Int? = null,
         val countdownHour: Int? = null,
         val serverTime: Long? = null,
-        val woolUser: Any? = null
+        val woolUser: Any? = null // Adding this field to handle the unrecognized property
     )
 
+    // Data classes for movie/series details
     data class MovieDetailsResponse(
         val code: Int,
         val msg: String,
@@ -188,6 +196,7 @@ class CastleTvProvider : MainAPI() {
         val coverImage: String? = null
     )
 
+    // Data classes for search response
     data class SearchApiResponse(
         val code: Int,
         val msg: String,
@@ -222,6 +231,7 @@ class CastleTvProvider : MainAPI() {
         val countries: List<String>? = null
     )
 
+    // Data classes for video/streaming response
     data class VideoResponse(
         val code: Int,
         val msg: String,
@@ -252,7 +262,12 @@ class CastleTvProvider : MainAPI() {
             val url = "$mainUrl/v0.1/system/getSecurityKey/1?channel=IndiaA&clientType=1&lang=en-US"
             val response = app.get(url)
             val securityResponse = mapper.readValue<SecurityKeyResponse>(response.text)
-            if (securityResponse.code == 200) securityResponse.data else null
+
+            if (securityResponse.code == 200) {
+                securityResponse.data
+            } else {
+                null
+            }
         } catch (e: Exception) {
             null
         }
@@ -261,6 +276,7 @@ class CastleTvProvider : MainAPI() {
     private fun deriveKey(apiKeyB64: String): ByteArray {
         val apiKeyBytes = base64DecodeArray(apiKeyB64)
         val keyMaterial = apiKeyBytes + keySupFixx.toByteArray(StandardCharsets.US_ASCII)
+
         return when {
             keyMaterial.size < 16 -> keyMaterial + ByteArray(16 - keyMaterial.size)
             keyMaterial.size > 16 -> keyMaterial.copyOfRange(0, 16)
@@ -271,11 +287,14 @@ class CastleTvProvider : MainAPI() {
     private fun decryptData(encryptedB64: String, apiKeyB64: String): String? {
         return try {
             val aesKey = deriveKey(apiKeyB64)
-            val iv = aesKey
+            val iv = aesKey // Use the same key as IV as confirmed by analysis
+
             val encryptedData = base64DecodeArray(encryptedB64)
+
             val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
             val secretKey = SecretKeySpec(aesKey, "AES")
             val ivSpec = IvParameterSpec(iv)
+
             cipher.init(Cipher.DECRYPT_MODE, secretKey, ivSpec)
             val decrypted = cipher.doFinal(encryptedData)
             String(decrypted, StandardCharsets.UTF_8)
@@ -289,24 +308,27 @@ class CastleTvProvider : MainAPI() {
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+        // Show star popup on first visit (shared across all CNCVerse plugins)
+        context?.let { StarPopupHelper.showStarPopupIfNeeded(it) }
+
         return try {
             val securityKey = getSecurityKey() ?: return newHomePageResponse(emptyList())
-            val url =
-                "$mainUrl/film-api/v0.1/category/home?channel=IndiaA&clientType=1&clientType=1&lang=en-US&locationId=1001&mode=1&packageName=com.external.castle&page=$page&size=17"
+            val url = "$mainUrl/film-api/v0.1/category/home?channel=IndiaA&clientType=1&clientType=1&lang=en-US&locationId=1001&mode=1&packageName=com.external.castle&page=$page&size=17"
             val response = app.get(url)
             val apiResponse = try {
                 mapper.readValue<CastleApiResponse>(response.text)
             } catch (e: Exception) {
                 CastleApiResponse(200, "OK", response.text)
-            }
-
-            val encryptedData = apiResponse.data
+            }           
+            val encryptedData = apiResponse.data            
             if (encryptedData.isNullOrBlank()) {
                 return newHomePageResponse(emptyList())
-            }
-
+            }           
             val decryptedJson = decryptData(encryptedData, securityKey)
-                ?: return newHomePageResponse(emptyList())
+
+            if (decryptedJson == null) {
+                return newHomePageResponse(emptyList())
+            }
 
             val decryptedResponse = mapper.readValue<DecryptedResponse>(decryptedJson)
             val homePageData = decryptedResponse.data
@@ -317,8 +339,9 @@ class CastleTvProvider : MainAPI() {
                     val title = content.title ?: return@mapNotNull null
                     val id = content.redirectId?.toString() ?: return@mapNotNull null
                     val coverImg = content.coverImage
+                    // movieType: 1=TvSeries, 2=Movie, 3=Reality Shows, 5=Anime
                     val type = when (content.movieType) {
-                        1, 3, 5 -> TvType.TvSeries
+                        1, 3, 5 -> TvType.TvSeries // Series, Reality Shows, Anime
                         2 -> TvType.Movie
                         else -> TvType.Movie
                     }
@@ -332,10 +355,7 @@ class CastleTvProvider : MainAPI() {
                     }
                 } ?: emptyList()
 
-                if (contents.isNotEmpty() &&
-                    rowName != "Hot Erotic Series" &&
-                    rowName != "Bollywood Star"
-                ) {
+                if (contents.isNotEmpty() && rowName != "Hot Erotic Series" && rowName != "Bollywood Star") {
                     HomePageList(rowName, contents)
                 } else {
                     null
@@ -343,68 +363,80 @@ class CastleTvProvider : MainAPI() {
             } ?: emptyList()
 
             newHomePageResponse(homePageLists)
+
         } catch (e: Exception) {
             newHomePageResponse(emptyList())
         }
     }
 
-override suspend fun search(query: String): List<SearchResponse> {
-    return try {
-        if (query.isBlank()) return emptyList()
+    override suspend fun search(query: String): List<com.lagradost.cloudstream3.SearchResponse> {
+        return try {
+            if (query.isBlank()) return emptyList()           
+            val securityKey = getSecurityKey() ?: return emptyList()          
+            val searchUrl = "$mainUrl/film-api/v1.1.0/movie/searchByKeyword?channel=IndiaA&clientType=1&clientType=1&keyword=${java.net.URLEncoder.encode(query, "UTF-8")}&lang=en-US&mode=1&packageName=com.external.castle&page=1&size=30"
 
-        val securityKey = getSecurityKey() ?: return emptyList()
-        val encoded = java.net.URLEncoder.encode(query, "UTF-8")
-        val searchUrl =
-            "$mainUrl/film-api/v1.1.0/movie/searchByKeyword?channel=IndiaA&clientType=1&clientType=1&keyword=$encoded&lang=en-US&mode=1&packageName=com.external.castle&page=1&size=30"
+            val response = app.get(searchUrl)
+            val encryptedData = response.text
 
-        val response = app.get(searchUrl)
-        val encryptedData = response.text
-        if (encryptedData.isBlank()) return emptyList()
-
-        val decryptedJson = decryptData(encryptedData, securityKey) ?: return emptyList()
-        val searchResponse = mapper.readValue<SearchApiResponse>(decryptedJson)
-        val searchData = searchResponse.data
-
-        searchData.rows?.mapNotNull { item ->
-            val title = item.title ?: return@mapNotNull null
-            val id = item.id?.toString() ?: return@mapNotNull null
-            val posterUrl = item.coverVerticalImage ?: item.coverHorizontalImage
-            val type = when (item.movieType) {
-                1, 3, 5 -> TvType.TvSeries
-                2 -> TvType.Movie
-                else -> TvType.Movie
+            if (encryptedData.isNullOrBlank()) {
+                return emptyList()
             }
 
-            newMovieSearchResponse(
-                name = title,
-                url = id,
-                type = type
-            ) {
-                this.posterUrl = posterUrl
-                this.year = item.publishTime?.let { timestamp ->
-                    Instant.ofEpochMilli(timestamp)
-                        .atZone(ZoneId.systemDefault())
-                        .year
+            val decryptedJson = decryptData(encryptedData, securityKey)
+            if (decryptedJson == null) {
+                return emptyList()
+            }
+
+            val searchResponse = mapper.readValue<SearchApiResponse>(decryptedJson)
+            val searchData = searchResponse.data
+
+            searchData.rows?.mapNotNull { item ->
+                val title = item.title ?: return@mapNotNull null
+                val id = item.id?.toString() ?: return@mapNotNull null
+                val posterUrl = item.coverVerticalImage ?: item.coverHorizontalImage
+                // movieType: 1=TvSeries, 2=Movie, 3=Reality Shows, 5=Anime
+                val type = when (item.movieType) {
+                    1, 3, 5 -> TvType.TvSeries // Series, Reality Shows, Anime
+                    2 -> TvType.Movie
+                    else -> TvType.Movie
                 }
-            }
-        } ?: emptyList()
-    } catch (e: Exception) {
-        emptyList()
+
+                newMovieSearchResponse(
+                    name = title,
+                    url = id,
+                    type = type
+                ) {
+                    this.posterUrl = posterUrl
+                    this.year = item.publishTime?.let { timestamp ->
+                        Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()).year
+                    }
+                }
+            } ?: emptyList()
+
+        } catch (e: Exception) {
+            emptyList()
+        }
     }
-}
 
     override suspend fun load(url: String): LoadResponse? {
         return try {
             val movieId = url.substringAfterLast('/')
+
             val securityKey = getSecurityKey() ?: return null
-            val detailsUrl =
-                "$mainUrl/film-api/v1.9.9/movie?channel=IndiaA&clientType=1&clientType=1&lang=en-US&movieId=$movieId&packageName=com.external.castle"
+            val detailsUrl = "$mainUrl/film-api/v1.9.9/movie?channel=IndiaA&clientType=1&clientType=1&lang=en-US&movieId=$movieId&packageName=com.external.castle"
 
             val response = app.get(detailsUrl)
             val encryptedData = response.text
-            if (encryptedData.isBlank()) return null
 
-            val decryptedJson = decryptData(encryptedData, securityKey) ?: return null
+            if (encryptedData.isNullOrBlank()) {
+                return null
+            }
+
+            val decryptedJson = decryptData(encryptedData, securityKey)
+            if (decryptedJson == null) {
+                return null
+            }
+
             val detailsResponse = mapper.readValue<MovieDetailsResponse>(decryptedJson)
             val details = detailsResponse.data
 
@@ -415,118 +447,122 @@ override suspend fun search(query: String): List<SearchResponse> {
             val year = details.publishTime?.let { timestamp ->
                 Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()).year
             }
+            val rating = details.score?.times(1000)?.toInt() // Convert to CloudStream format
             val tags = details.tags
-            val actors = details.actors?.map {
-                ActorData(Actor(it.name ?: "", it.avatar))
+            val actors = details.actors?.map { 
+                ActorData(
+                    Actor(it.name ?: "", it.avatar)
+                )
             }
-            val recommendations = emptyList<SearchResponse>()
+            val recommendations = emptyList<SearchResponse>() // Can be populated later if needed
 
-            val isSeriesLike = details.movieType == 1 ||
-                details.movieType == 3 ||
-                details.movieType == 5 ||
-                (details.episodes?.size ?: 0) > 1
+            // Determine if this is series-like content (has multiple episodes) or a movie
+            // movieType: 1=TvSeries, 2=Movie, 3=Reality Shows, 5=Anime
+            val isSeriesLike = details.movieType == 1 || details.movieType == 3 || details.movieType == 5 || 
+                               (details.episodes?.size ?: 0) > 1
 
-            if (isSeriesLike) {
-                val allEpisodes = mutableListOf<Episode>()
+            when {
+                isSeriesLike -> { // TV Series, Reality Shows, Anime (anything with episodes)
+                    val allEpisodes = mutableListOf<com.lagradost.cloudstream3.Episode>()
 
-                if (details.seasons != null && details.seasons.size > 1) {
-                    for (season in details.seasons) {
-                        val seasonId = season.movieId?.toString() ?: continue
-                        val seasonNumber = season.number ?: continue
+                    // If there are multiple seasons, fetch episodes for each season
+                    if (details.seasons != null && details.seasons.size > 1) {
 
-                        try {
-                            val seasonUrl =
-                                "$mainUrl/film-api/v1.9.9/movie?channel=IndiaA&clientType=1&clientType=1&lang=en-US&movieId=$seasonId&packageName=com.external.castle"
-                            val seasonResponse = app.get(seasonUrl)
-                            val seasonEncryptedData = seasonResponse.text
+                        for (season in details.seasons) {
+                            val seasonId = season.movieId?.toString() ?: continue
+                            val seasonNumber = season.number ?: continue
 
-                            if (seasonEncryptedData.isNotBlank()) {
-                                val seasonDecryptedJson =
-                                    decryptData(seasonEncryptedData, securityKey)
-                                if (seasonDecryptedJson != null) {
-                                    val seasonDetailsResponse =
-                                        mapper.readValue<MovieDetailsResponse>(seasonDecryptedJson)
-                                    val seasonDetails = seasonDetailsResponse.data
-                                    seasonDetails.episodes?.forEach { episode ->
-                                        allEpisodes.add(
-                                            newEpisode("${seasonId}_${episode.id}") {
-                                                this.name =
-                                                    episode.title
-                                                        ?: "Episode ${episode.number ?: allEpisodes.size + 1}"
-                                                this.season = seasonNumber
-                                                this.episode =
-                                                    episode.number ?: allEpisodes.size + 1
-                                                this.posterUrl = episode.coverImage
-                                            }
-                                        )
+                            try {
+                                // Fetch episodes for this season
+                                val seasonUrl = "$mainUrl/film-api/v1.9.9/movie?channel=IndiaA&clientType=1&clientType=1&lang=en-US&movieId=$seasonId&packageName=com.external.castle"
+                                val seasonResponse = app.get(seasonUrl)
+                                val seasonEncryptedData = seasonResponse.text
+
+                                if (!seasonEncryptedData.isNullOrBlank()) {
+                                    val seasonDecryptedJson = decryptData(seasonEncryptedData, securityKey)
+                                    if (seasonDecryptedJson != null) {
+                                        val seasonDetailsResponse = mapper.readValue<MovieDetailsResponse>(seasonDecryptedJson)
+                                        val seasonDetails = seasonDetailsResponse.data
+                                                          seasonDetails.episodes?.forEach { episode ->
+                            allEpisodes.add(
+                                newEpisode("${seasonId}_${episode.id}") {
+                                    this.name = episode.title ?: "Episode ${episode.number ?: allEpisodes.size + 1}"
+                                    this.season = seasonNumber
+                                    this.episode = episode.number ?: allEpisodes.size + 1
+                                    this.posterUrl = episode.coverImage
+                                }
+                            )
+                        }
                                     }
                                 }
+                            } catch (e: Exception) {
+                                // Continue with other seasons even if one fails
                             }
-                        } catch (_: Exception) {
+                        }
+                    } else {
+                        // Single season or no season info, use current episodes
+                        details.episodes?.forEachIndexed { index, episode ->
+                            allEpisodes.add(
+                                newEpisode("${details.id}_${episode.id}") {
+                                    this.name = episode.title ?: "Episode ${episode.number ?: index + 1}"
+                                    this.season = details.seasonNumber
+                                    this.episode = episode.number ?: index + 1
+                                    this.posterUrl = episode.coverImage
+                                }
+                            )
                         }
                     }
-                } else {
-                    details.episodes?.forEachIndexed { index, episode ->
-                        allEpisodes.add(
-                           newEpisode("${details.id}_${episode.id}") {
-                                this.name =
-                                    episode.title ?: "Episode ${episode.number ?: index + 1}"
-                                this.season = details.seasonNumber
-                                this.episode = episode.number ?: index + 1
-                                this.posterUrl = episode.coverImage
-                            }
-                        )
-                    }
-                }
 
-                newTvSeriesLoadResponse(
-                    name = title,
-                    url = url,
-                    type = TvType.TvSeries,
-                    episodes = allEpisodes
-                ) {
-                    this.posterUrl = posterUrl
-                    this.backgroundPosterUrl = backgroundPosterUrl
-                    this.plot = plot
-                    this.year = year
-                    this.score = details.score?.let { Score.from10(it) }
-                    this.tags = tags
-                    this.actors = actors
-                    this.recommendations = recommendations
-                    this.duration = details.episodes?.firstOrNull()?.duration?.div(60)
-                    this.showStatus =
-                        if (details.seasonDescription?.contains("season", true) == true) {
+                    newTvSeriesLoadResponse(
+                        name = title,
+                        url = url,
+                        type = TvType.TvSeries,
+                        episodes = allEpisodes
+                    ) {
+                        this.posterUrl = posterUrl
+                        this.backgroundPosterUrl = backgroundPosterUrl
+                        this.plot = plot
+                        this.year = year
+                        this.score = Score.from(rating, 1000)
+                        this.tags = tags
+                        this.actors = actors
+                        this.recommendations = recommendations
+                        this.duration = details.episodes?.firstOrNull()?.duration?.div(60) // Convert seconds to minutes
+                        this.showStatus = if (details.seasonDescription?.contains("season", true) == true) {
                             ShowStatus.Ongoing
                         } else {
                             ShowStatus.Completed
                         }
+                    }
                 }
-            } else {
-                val episode = details.episodes?.firstOrNull()
-                newMovieLoadResponse(
-                    name = title,
-                    url = url,
-                    type = TvType.Movie,
-                    dataUrl = "${details.id}_${episode?.id}"
-                ) {
-                    this.posterUrl = posterUrl
-                    this.backgroundPosterUrl = backgroundPosterUrl
-                    this.plot = plot
-                    this.year = year
-                    this.score = details.score?.let { Score.from10(it) }
-                    this.tags = tags
-                    this.actors = actors
-                    this.recommendations = recommendations
-                    this.duration = episode?.duration?.div(60)
+                else -> { // Movie (movieType 2 or single episode content)
+                    val episode = details.episodes?.firstOrNull()
+                    newMovieLoadResponse(
+                        name = title,
+                        url = url,
+                        type = TvType.Movie,
+                        dataUrl = "${details.id}_${episode?.id}" // Combine movie ID and episode ID
+                    ) {
+                        this.posterUrl = posterUrl
+                        this.backgroundPosterUrl = backgroundPosterUrl
+                        this.plot = plot
+                        this.year = year
+                        this.score = Score.from(rating, 1000)
+                        this.tags = tags
+                        this.actors = actors
+                        this.recommendations = recommendations
+                        this.duration = episode?.duration?.div(60) // Convert seconds to minutes
+                    }
                 }
             }
+
         } catch (e: Exception) {
             e.printStackTrace()
             null
         }
     }
 
-  override suspend fun loadLinks(
+    override suspend fun loadLinks(
     data: String,
     isCasting: Boolean,
     subtitleCallback: (SubtitleFile) -> Unit,
@@ -534,35 +570,37 @@ override suspend fun search(query: String): List<SearchResponse> {
 ): Boolean {
     return try {
         val parts = data.split("_")
-        if (parts.size != 2) return false
+        if (parts.size != 2) {
+            return false
+        }
 
-        val movieId =
-            if (parts[0].contains("/")) parts[0].substringAfterLast('/') else parts[0]
+        val movieId = if (parts[0].contains("/")) parts[0].substringAfterLast('/') else parts[0]
         val episodeId = parts[1]
 
         val securityKey = getSecurityKey() ?: return false
-        val detailsUrl =
-            "$mainUrl/film-api/v1.9.9/movie?channel=IndiaA&clientType=1&clientType=1&lang=en-US&movieId=$movieId&packageName=com.external.castle"
+        val detailsUrl = "$mainUrl/film-api/v1.9.9/movie?channel=IndiaA&clientType=1&clientType=1&lang=en-US&movieId=$movieId&packageName=com.external.castle"
         val detailsResponse = app.get(detailsUrl)
         val detailsDecrypted = decryptData(detailsResponse.text, securityKey) ?: return false
         val details = mapper.readValue<MovieDetailsResponse>(detailsDecrypted).data
 
-        val episode = details.episodes?.find { it.id?.toString() == episodeId } ?: return false
+        val episode = details.episodes?.find { it.id?.toString() == episodeId }
+        if (episode == null) {
+            return false
+        }
+
         val availableTracks = episode.tracks ?: emptyList()
         val resolutions = listOf(3, 2, 1)
-
         var videoLoaded = false
-        val hasIndividualVideo = availableTracks.any { it.existIndividualVideo == true }
 
+        val hasIndividualVideo = availableTracks.any { it.existIndividualVideo == true }
         if (!hasIndividualVideo && availableTracks.isNotEmpty()) {
-            val allLanguageNames =
-                availableTracks.mapNotNull { it.languageName ?: it.abbreviate }
-                    .joinToString(", ")
+            val firstTrack = availableTracks.first()
+            val languageId = firstTrack.languageId ?: return false
+            val allLanguageNames = availableTracks.mapNotNull { it.languageName ?: it.abbreviate }.joinToString(", ")
 
             for (resolution in resolutions) {
                 try {
-                    val videoUrl =
-                        "$mainUrl/film-api/v2.0.1/movie/getVideo2?clientType=1&packageName=com.external.castle&channel=IndiaA&lang=en-US"
+                    val videoUrl = "$mainUrl/film-api/v2.0.1/movie/getVideo2?clientType=1&packageName=com.external.castle&channel=IndiaA&lang=en-US"
                     val postBody = """
                         {
                           "mode": "1",
@@ -581,42 +619,44 @@ override suspend fun search(query: String): List<SearchResponse> {
 
                     val videoResponse = app.post(
                         url = videoUrl,
-                        requestBody = postBody.toRequestBody("application/json; charset=utf-8".toMediaType())
+                        requestBody = postBody.toRequestBody("application/json; charset=utf-8".toMediaType()),
                     )
 
                     val encryptedData = videoResponse.text
-                    if (encryptedData.isBlank()) continue
+                    if (encryptedData.isNullOrBlank()) {
+                        continue
+                    }
 
-                    val decryptedJson = decryptData(encryptedData, securityKey) ?: continue
+                    val decryptedJson = decryptData(encryptedData, securityKey)
+                    if (decryptedJson == null) {
+                        continue
+                    }
                     val videoData = mapper.readValue<VideoResponse>(decryptedJson).data
 
                     if (videoData.videoUrl != null && videoData.permissionDenied != true) {
+                        // 🔥 FIX: Use index.m3u8, preserve domain, NO query parameters
                         val originalUrl = videoData.videoUrl
-                        
-                        // 🔥 FIX: Always use index.m3u8 with NO query parameters
                         val basePath = originalUrl.substringBefore("?").substringBeforeLast("/")
                         val finalUrl = "$basePath/index.m3u8"
 
                         callback.invoke(
                             newExtractorLink(
                                 source = name,
-                                name = if (
-                                    finalUrl.contains("preview", ignoreCase = true) ||
-                                    originalUrl.contains("preview", ignoreCase = true)
-                                ) {
-                                    "$name - $allLanguageNames (PREVIEW - Premium Required)"
+                                name = if (videoData.videoUrl?.contains("preview", ignoreCase = true) == true) {
+                                    "$name - $allLanguageNames (preview) Requires Castle TV Premium"
                                 } else {
                                     "$name - $allLanguageNames"
                                 },
                                 url = finalUrl,
                                 type = ExtractorLinkType.M3U8
-                            ) {
+                            )
+                            {
                                 this.headers = mapOf("Referer" to mainUrl)
                                 this.quality = when (resolution) {
                                     3 -> 1080
                                     2 -> 720
                                     1 -> 480
-                                    else -> Qualities.Unknown.value
+                                    else -> resolution * 240
                                 }
                             }
                         )
@@ -626,18 +666,17 @@ override suspend fun search(query: String): List<SearchResponse> {
                                 if (!subtitle.url.isNullOrBlank()) {
                                     subtitleCallback.invoke(
                                         newSubtitleFile(
-                                            lang = subtitle.title
-                                                ?: subtitle.abbreviate
-                                                ?: "Unknown",
+                                            lang = subtitle.title ?: subtitle.abbreviate ?: "Unknown",
                                             url = subtitle.url
                                         )
                                     )
                                 }
                             }
                         }
+
                         videoLoaded = true
                     }
-                } catch (_: Exception) {
+                } catch (e: Exception) {
                 }
             }
         } else {
@@ -647,11 +686,31 @@ override suspend fun search(query: String): List<SearchResponse> {
 
                 for (resolution in resolutions) {
                     try {
-                        val videoUrl = "$mainUrl/film-api/v1.9.1/movie/getVideo?apkSignKey=ED0955EB04E67A1D9F3305B95454FED485261475&channel=IndiaA&clientType=1&clientType=1&episodeId=$episodeId&lang=en-US&languageId=$languageId&mode=1&movieId=$movieId&packageName=com.external.castle&resolution=$resolution"
-                        
-                        val videoResponse = app.get(videoUrl)
+                        val videoUrl = "$mainUrl/film-api/v2.0.1/movie/getVideo2?clientType=1&packageName=com.external.castle&channel=IndiaA&lang=en-US"
+                        val postBody = """
+                            {
+                              "mode": "1",
+                              "appMarket": "GuanWang",
+                              "clientType": "1",
+                              "woolUser": "false",
+                              "apkSignKey": "ED0955EB04E67A1D9F3305B95454FED485261475",
+                              "androidVersion": "13",
+                              "languageId": "$languageId",
+                              "movieId": "$movieId",
+                              "episodeId": "$episodeId",
+                              "isNewUser": "true",
+                              "resolution": "$resolution",
+                              "packageName": "com.external.castle"
+                            }
+                        """.trimIndent()
+
+                        val videoResponse = app.post(
+                            url = videoUrl,
+                            requestBody = postBody.toRequestBody("application/json; charset=utf-8".toMediaType()),
+                        )
 
                         val encryptedData = videoResponse.text
+
                         if (encryptedData.isNullOrBlank()) {
                             continue
                         }
@@ -663,32 +722,29 @@ override suspend fun search(query: String): List<SearchResponse> {
                         val videoData = mapper.readValue<VideoResponse>(decryptedJson).data
 
                         if (videoData.videoUrl != null && videoData.permissionDenied != true) {
+                            // 🔥 FIX: Use index.m3u8, preserve domain, NO query parameters
                             val originalUrl = videoData.videoUrl
-                            
-                            // 🔥 FIX: Always use index.m3u8 with NO query parameters
                             val basePath = originalUrl.substringBefore("?").substringBeforeLast("/")
                             val finalUrl = "$basePath/index.m3u8"
 
                             callback.invoke(
                                 newExtractorLink(
                                     source = name,
-                                    name = if (
-                                        finalUrl.contains("preview", ignoreCase = true) ||
-                                        originalUrl.contains("preview", ignoreCase = true)
-                                    ) {
-                                        "$name - $languageName (PREVIEW - Premium Required)"
+                                    name = if (videoData.videoUrl?.contains("preview", ignoreCase = true) == true) {
+                                        "$name - $languageName (preview) Requires Castle TV Premium"
                                     } else {
                                         "$name - $languageName"
                                     },
                                     url = finalUrl,
                                     type = ExtractorLinkType.M3U8
-                                ) {
+                                )
+                                {
                                     this.headers = mapOf("Referer" to mainUrl)
                                     this.quality = when (resolution) {
                                         3 -> 1080
                                         2 -> 720
                                         1 -> 480
-                                        else -> Qualities.Unknown.value
+                                        else -> resolution * 240
                                     }
                                 }
                             )
@@ -698,24 +754,24 @@ override suspend fun search(query: String): List<SearchResponse> {
                                     if (!subtitle.url.isNullOrBlank()) {
                                         subtitleCallback.invoke(
                                             newSubtitleFile(
-                                                lang = subtitle.title
-                                                    ?: subtitle.abbreviate
-                                                    ?: "Unknown",
+                                                lang = subtitle.title ?: subtitle.abbreviate ?: "Unknown",
                                                 url = subtitle.url
                                             )
                                         )
                                     }
                                 }
                             }
+
                             videoLoaded = true
                         }
-                    } catch (_: Exception) {
+                    } catch (e: Exception) {
                     }
                 }
             }
         }
 
         videoLoaded
+
     } catch (e: Exception) {
         false
     }
