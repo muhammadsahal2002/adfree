@@ -526,38 +526,134 @@ override suspend fun search(query: String): List<SearchResponse> {
         }
     }
 
-    override suspend fun loadLinks(
-        data: String,
-        isCasting: Boolean,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ): Boolean {
-        return try {
-            val parts = data.split("_")
-            if (parts.size != 2) return false
+   override suspend fun loadLinks(
+    data: String,
+    isCasting: Boolean,
+    subtitleCallback: (SubtitleFile) -> Unit,
+    callback: (ExtractorLink) -> Unit
+): Boolean {
+    return try {
+        val parts = data.split("_")
+        if (parts.size != 2) return false
 
-            val movieId =
-                if (parts[0].contains("/")) parts[0].substringAfterLast('/') else parts[0]
-            val episodeId = parts[1]
+        val movieId =
+            if (parts[0].contains("/")) parts[0].substringAfterLast('/') else parts[0]
+        val episodeId = parts[1]
 
-            val securityKey = getSecurityKey() ?: return false
-            val detailsUrl =
-                "$mainUrl/film-api/v1.9.9/movie?channel=IndiaA&clientType=1&clientType=1&lang=en-US&movieId=$movieId&packageName=com.external.castle"
-            val detailsResponse = app.get(detailsUrl)
-            val detailsDecrypted = decryptData(detailsResponse.text, securityKey) ?: return false
-            val details = mapper.readValue<MovieDetailsResponse>(detailsDecrypted).data
+        val securityKey = getSecurityKey() ?: return false
+        val detailsUrl =
+            "$mainUrl/film-api/v1.9.9/movie?channel=IndiaA&clientType=1&clientType=1&lang=en-US&movieId=$movieId&packageName=com.external.castle"
+        val detailsResponse = app.get(detailsUrl)
+        val detailsDecrypted = decryptData(detailsResponse.text, securityKey) ?: return false
+        val details = mapper.readValue<MovieDetailsResponse>(detailsDecrypted).data
 
-            val episode = details.episodes?.find { it.id?.toString() == episodeId } ?: return false
-            val availableTracks = episode.tracks ?: emptyList()
-            val resolutions = listOf(3, 2, 1)
+        val episode = details.episodes?.find { it.id?.toString() == episodeId } ?: return false
+        val availableTracks = episode.tracks ?: emptyList()
+        val resolutions = listOf(3, 2, 1)
 
-            var videoLoaded = false
-            val hasIndividualVideo = availableTracks.any { it.existIndividualVideo == true }
+        var videoLoaded = false
+        val hasIndividualVideo = availableTracks.any { it.existIndividualVideo == true }
 
-            if (!hasIndividualVideo && availableTracks.isNotEmpty()) {
-                val allLanguageNames =
-                    availableTracks.mapNotNull { it.languageName ?: it.abbreviate }
-                        .joinToString(", ")
+        if (!hasIndividualVideo && availableTracks.isNotEmpty()) {
+            val allLanguageNames =
+                availableTracks.mapNotNull { it.languageName ?: it.abbreviate }
+                    .joinToString(", ")
+
+            for (resolution in resolutions) {
+                try {
+                    val videoUrl =
+                        "$mainUrl/film-api/v2.0.1/movie/getVideo2?clientType=1&packageName=com.external.castle&channel=IndiaA&lang=en-US"
+                    val postBody = """
+                        {
+                          "mode": "1",
+                          "appMarket": "GuanWang",
+                          "clientType": "1",
+                          "woolUser": "false",
+                          "apkSignKey": "ED0955EB04E67A1D9F3305B95454FED485261475",
+                          "androidVersion": "13",
+                          "movieId": "$movieId",
+                          "episodeId": "$episodeId",
+                          "isNewUser": "true",
+                          "resolution": "$resolution",
+                          "packageName": "com.external.castle"
+                        }
+                    """.trimIndent()
+
+                    val videoResponse = app.post(
+                        url = videoUrl,
+                        requestBody = postBody.toRequestBody("application/json; charset=utf-8".toMediaType())
+                    )
+
+                    val encryptedData = videoResponse.text
+                    if (encryptedData.isBlank()) continue
+
+                    val decryptedJson = decryptData(encryptedData, securityKey) ?: continue
+                    val videoData = mapper.readValue<VideoResponse>(decryptedJson).data
+
+                    if (videoData.videoUrl != null && videoData.permissionDenied != true) {
+                        val originalUrl = videoData.videoUrl
+
+                        // Always strip query parameters, convert image/preview → index.m3u8
+                        val cleaned = originalUrl.substringBefore("?")
+                        val finalUrl = if (
+                            cleaned.contains("preview", ignoreCase = true) ||
+                            cleaned.endsWith(".jpg") ||
+                            cleaned.endsWith(".png") ||
+                            cleaned.endsWith(".jpeg")
+                        ) {
+                            val basePath = cleaned.substringBeforeLast("/")
+                            "$basePath/index.m3u8"
+                        } else {
+                            cleaned   // keep only up to .m3u8
+                        }
+
+                        callback.invoke(
+                            newExtractorLink(
+                                source = name,
+                                name = if (
+                                    finalUrl.contains("preview", ignoreCase = true) ||
+                                    originalUrl.contains("preview", ignoreCase = true)
+                                ) {
+                                    "$name - $allLanguageNames (PREVIEW - Premium Required)"
+                                } else {
+                                    "$name - $allLanguageNames"
+                                },
+                                url = finalUrl,
+                                type = ExtractorLinkType.M3U8
+                            ) {
+                                this.headers = mapOf("Referer" to mainUrl)
+                                this.quality = when (resolution) {
+                                    3 -> 1080
+                                    2 -> 720
+                                    1 -> 480
+                                    else -> Qualities.Unknown.value
+                                }
+                            }
+                        )
+
+                        if (!videoLoaded) {
+                            videoData.subtitles?.forEach { subtitle ->
+                                if (!subtitle.url.isNullOrBlank()) {
+                                    subtitleCallback.invoke(
+                                        newSubtitleFile(
+                                            lang = subtitle.title
+                                                ?: subtitle.abbreviate
+                                                ?: "Unknown",
+                                            url = subtitle.url
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                        videoLoaded = true
+                    }
+                } catch (_: Exception) {
+                }
+            }
+        } else {
+            for (track in availableTracks) {
+                val languageId = track.languageId ?: continue
+                val languageName = track.languageName ?: track.abbreviate ?: "Unknown"
 
                 for (resolution in resolutions) {
                     try {
@@ -571,6 +667,7 @@ override suspend fun search(query: String): List<SearchResponse> {
                               "woolUser": "false",
                               "apkSignKey": "ED0955EB04E67A1D9F3305B95454FED485261475",
                               "androidVersion": "13",
+                              "languageId": "$languageId",
                               "movieId": "$movieId",
                               "episodeId": "$episodeId",
                               "isNewUser": "true",
@@ -592,17 +689,19 @@ override suspend fun search(query: String): List<SearchResponse> {
 
                         if (videoData.videoUrl != null && videoData.permissionDenied != true) {
                             val originalUrl = videoData.videoUrl
+
+                            // Always strip query parameters, convert image/preview → index.m3u8
+                            val cleaned = originalUrl.substringBefore("?")
                             val finalUrl = if (
-                                originalUrl.contains("preview", ignoreCase = true) ||
-                                originalUrl.endsWith(".jpg") ||
-                                originalUrl.endsWith(".png") ||
-                                originalUrl.endsWith(".jpeg")
+                                cleaned.contains("preview", ignoreCase = true) ||
+                                cleaned.endsWith(".jpg") ||
+                                cleaned.endsWith(".png") ||
+                                cleaned.endsWith(".jpeg")
                             ) {
-                                val basePath =
-                                    originalUrl.substringBefore("?").substringBeforeLast("/")
+                                val basePath = cleaned.substringBeforeLast("/")
                                 "$basePath/index.m3u8"
                             } else {
-                                originalUrl
+                                cleaned   // keep only up to .m3u8
                             }
 
                             callback.invoke(
@@ -612,9 +711,9 @@ override suspend fun search(query: String): List<SearchResponse> {
                                         finalUrl.contains("preview", ignoreCase = true) ||
                                         originalUrl.contains("preview", ignoreCase = true)
                                     ) {
-                                        "$name - $allLanguageNames (PREVIEW - Premium Required)"
+                                        "$name - $languageName (PREVIEW - Premium Required)"
                                     } else {
-                                        "$name - $allLanguageNames"
+                                        "$name - $languageName"
                                     },
                                     url = finalUrl,
                                     type = ExtractorLinkType.M3U8
@@ -648,107 +747,11 @@ override suspend fun search(query: String): List<SearchResponse> {
                     } catch (_: Exception) {
                     }
                 }
-            } else {
-                for (track in availableTracks) {
-                    val languageId = track.languageId ?: continue
-                    val languageName = track.languageName ?: track.abbreviate ?: "Unknown"
-
-                    for (resolution in resolutions) {
-                        try {
-                            val videoUrl =
-                                "$mainUrl/film-api/v2.0.1/movie/getVideo2?clientType=1&packageName=com.external.castle&channel=IndiaA&lang=en-US"
-                            val postBody = """
-                                {
-                                  "mode": "1",
-                                  "appMarket": "GuanWang",
-                                  "clientType": "1",
-                                  "woolUser": "false",
-                                  "apkSignKey": "ED0955EB04E67A1D9F3305B95454FED485261475",
-                                  "androidVersion": "13",
-                                  "languageId": "$languageId",
-                                  "movieId": "$movieId",
-                                  "episodeId": "$episodeId",
-                                  "isNewUser": "true",
-                                  "resolution": "$resolution",
-                                  "packageName": "com.external.castle"
-                                }
-                            """.trimIndent()
-
-                            val videoResponse = app.post(
-                                url = videoUrl,
-                                requestBody = postBody.toRequestBody("application/json; charset=utf-8".toMediaType())
-                            )
-
-                            val encryptedData = videoResponse.text
-                            if (encryptedData.isBlank()) continue
-
-                            val decryptedJson = decryptData(encryptedData, securityKey) ?: continue
-                            val videoData = mapper.readValue<VideoResponse>(decryptedJson).data
-
-                            if (videoData.videoUrl != null && videoData.permissionDenied != true) {
-                                val originalUrl = videoData.videoUrl
-                                val finalUrl = if (
-                                    originalUrl.contains("preview", ignoreCase = true) ||
-                                    originalUrl.endsWith(".jpg") ||
-                                    originalUrl.endsWith(".png") ||
-                                    originalUrl.endsWith(".jpeg")
-                                ) {
-                                    val basePath =
-                                        originalUrl.substringBefore("?").substringBeforeLast("/")
-                                    "$basePath/index.m3u8"
-                                } else {
-                                    originalUrl
-                                }
-
-                                callback.invoke(
-                                    newExtractorLink(
-                                        source = name,
-                                        name = if (
-                                            finalUrl.contains("preview", ignoreCase = true) ||
-                                            originalUrl.contains("preview", ignoreCase = true)
-                                        ) {
-                                            "$name - $languageName (PREVIEW - Premium Required)"
-                                        } else {
-                                            "$name - $languageName"
-                                        },
-                                        url = finalUrl,
-                                        type = ExtractorLinkType.M3U8
-                                    ) {
-                                        this.headers = mapOf("Referer" to mainUrl)
-                                        this.quality = when (resolution) {
-                                            3 -> 1080
-                                            2 -> 720
-                                            1 -> 480
-                                            else -> Qualities.Unknown.value
-                                        }
-                                    }
-                                )
-
-                                if (!videoLoaded) {
-                                    videoData.subtitles?.forEach { subtitle ->
-                                        if (!subtitle.url.isNullOrBlank()) {
-                                            subtitleCallback.invoke(
-                                                newSubtitleFile(
-                                                    lang = subtitle.title
-                                                        ?: subtitle.abbreviate
-                                                        ?: "Unknown",
-                                                    url = subtitle.url
-                                                )
-                                            )
-                                        }
-                                    }
-                                }
-                                videoLoaded = true
-                            }
-                        } catch (_: Exception) {
-                        }
-                    }
-                }
             }
-
-            videoLoaded
-        } catch (e: Exception) {
-            false
         }
+
+        videoLoaded
+    } catch (e: Exception) {
+        false
     }
 }
