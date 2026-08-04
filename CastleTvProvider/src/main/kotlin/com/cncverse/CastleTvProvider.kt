@@ -449,7 +449,7 @@ override suspend fun search(query: String): List<SearchResponse> {
                                     val seasonDetails = seasonDetailsResponse.data
                                     seasonDetails.episodes?.forEach { episode ->
                                         allEpisodes.add(
-                                            newEpisode("\( {seasonId}_ \){episode.id}") {
+                                            newEpisode("${seasonId}_${episode.id}") {
                                                 this.name =
                                                     episode.title
                                                         ?: "Episode ${episode.number ?: allEpisodes.size + 1}"
@@ -468,7 +468,7 @@ override suspend fun search(query: String): List<SearchResponse> {
                 } else {
                     details.episodes?.forEachIndexed { index, episode ->
                         allEpisodes.add(
-                            newEpisode("\( {details.id}_ \){episode.id}") {
+                           newEpisode("${details.id}_${episode.id}") {
                                 this.name =
                                     episode.title ?: "Episode ${episode.number ?: index + 1}"
                                 this.season = details.seasonNumber
@@ -507,7 +507,7 @@ override suspend fun search(query: String): List<SearchResponse> {
                     name = title,
                     url = url,
                     type = TvType.Movie,
-                    dataUrl = "\( {details.id}_ \){episode?.id}"
+                    dataUrl = "${details.id}_${episode?.id}"
                 ) {
                     this.posterUrl = posterUrl
                     this.backgroundPosterUrl = backgroundPosterUrl
