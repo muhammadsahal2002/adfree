@@ -536,11 +536,13 @@ override suspend fun search(query: String): List<SearchResponse> {
         val parts = data.split("_")
         if (parts.size != 2) return false
 
-        val movieId = if (parts[0].contains("/")) parts[0].substringAfterLast('/') else parts[0]
+        val movieId =
+            if (parts[0].contains("/")) parts[0].substringAfterLast('/') else parts[0]
         val episodeId = parts[1]
 
         val securityKey = getSecurityKey() ?: return false
-        val detailsUrl = "$mainUrl/film-api/v1.9.9/movie?channel=IndiaA&clientType=1&clientType=1&lang=en-US&movieId=$movieId&packageName=com.external.castle"
+        val detailsUrl =
+            "$mainUrl/film-api/v1.9.9/movie?channel=IndiaA&clientType=1&clientType=1&lang=en-US&movieId=$movieId&packageName=com.external.castle"
         val detailsResponse = app.get(detailsUrl)
         val detailsDecrypted = decryptData(detailsResponse.text, securityKey) ?: return false
         val details = mapper.readValue<MovieDetailsResponse>(detailsDecrypted).data
@@ -553,11 +555,14 @@ override suspend fun search(query: String): List<SearchResponse> {
         val hasIndividualVideo = availableTracks.any { it.existIndividualVideo == true }
 
         if (!hasIndividualVideo && availableTracks.isNotEmpty()) {
-            val allLanguageNames = availableTracks.mapNotNull { it.languageName ?: it.abbreviate }.joinToString(", ")
+            val allLanguageNames =
+                availableTracks.mapNotNull { it.languageName ?: it.abbreviate }
+                    .joinToString(", ")
 
             for (resolution in resolutions) {
                 try {
-                    val videoUrl = "$mainUrl/film-api/v2.0.1/movie/getVideo2?clientType=1&packageName=com.external.castle&channel=IndiaA&lang=en-US"
+                    val videoUrl =
+                        "$mainUrl/film-api/v2.0.1/movie/getVideo2?clientType=1&packageName=com.external.castle&channel=IndiaA&lang=en-US"
                     val postBody = """
                         {
                           "mode": "1",
@@ -594,7 +599,10 @@ override suspend fun search(query: String): List<SearchResponse> {
                         callback.invoke(
                             newExtractorLink(
                                 source = name,
-                                name = if (finalUrl.contains("preview", ignoreCase = true) || originalUrl.contains("preview", ignoreCase = true)) {
+                                name = if (
+                                    finalUrl.contains("preview", ignoreCase = true) ||
+                                    originalUrl.contains("preview", ignoreCase = true)
+                                ) {
                                     "$name - $allLanguageNames (PREVIEW - Premium Required)"
                                 } else {
                                     "$name - $allLanguageNames"
@@ -617,7 +625,9 @@ override suspend fun search(query: String): List<SearchResponse> {
                                 if (!subtitle.url.isNullOrBlank()) {
                                     subtitleCallback.invoke(
                                         newSubtitleFile(
-                                            lang = subtitle.title ?: subtitle.abbreviate ?: "Unknown",
+                                            lang = subtitle.title
+                                                ?: subtitle.abbreviate
+                                                ?: "Unknown",
                                             url = subtitle.url
                                         )
                                     )
@@ -636,33 +646,20 @@ override suspend fun search(query: String): List<SearchResponse> {
 
                 for (resolution in resolutions) {
                     try {
-                        val videoUrl = "$mainUrl/film-api/v2.0.1/movie/getVideo2?clientType=1&packageName=com.external.castle&channel=IndiaA&lang=en-US"
-                        val postBody = """
-                            {
-                              "mode": "1",
-                              "appMarket": "GuanWang",
-                              "clientType": "1",
-                              "woolUser": "false",
-                              "apkSignKey": "ED0955EB04E67A1D9F3305B95454FED485261475",
-                              "androidVersion": "13",
-                              "languageId": "$languageId",
-                              "movieId": "$movieId",
-                              "episodeId": "$episodeId",
-                              "isNewUser": "true",
-                              "resolution": "$resolution",
-                              "packageName": "com.external.castle"
-                            }
-                        """.trimIndent()
-
-                        val videoResponse = app.post(
-                            url = videoUrl,
-                            requestBody = postBody.toRequestBody("application/json; charset=utf-8".toMediaType())
-                        )
+                        // 🔥 FIX: Use the correct API endpoint for individual tracks
+                        val videoUrl = "$mainUrl/film-api/v1.9.1/movie/getVideo?apkSignKey=ED0955EB04E67A1D9F3305B95454FED485261475&channel=IndiaA&clientType=1&clientType=1&episodeId=$episodeId&lang=en-US&languageId=$languageId&mode=1&movieId=$movieId&packageName=com.external.castle&resolution=$resolution"
+                        
+                        val videoResponse = app.get(videoUrl)
 
                         val encryptedData = videoResponse.text
-                        if (encryptedData.isBlank()) continue
+                        if (encryptedData.isNullOrBlank()) {
+                            continue
+                        }
 
-                        val decryptedJson = decryptData(encryptedData, securityKey) ?: continue
+                        val decryptedJson = decryptData(encryptedData, securityKey)
+                        if (decryptedJson == null) {
+                            continue
+                        }
                         val videoData = mapper.readValue<VideoResponse>(decryptedJson).data
 
                         if (videoData.videoUrl != null && videoData.permissionDenied != true) {
@@ -674,7 +671,10 @@ override suspend fun search(query: String): List<SearchResponse> {
                             callback.invoke(
                                 newExtractorLink(
                                     source = name,
-                                    name = if (finalUrl.contains("preview", ignoreCase = true) || originalUrl.contains("preview", ignoreCase = true)) {
+                                    name = if (
+                                        finalUrl.contains("preview", ignoreCase = true) ||
+                                        originalUrl.contains("preview", ignoreCase = true)
+                                    ) {
                                         "$name - $languageName (PREVIEW - Premium Required)"
                                     } else {
                                         "$name - $languageName"
@@ -697,7 +697,9 @@ override suspend fun search(query: String): List<SearchResponse> {
                                     if (!subtitle.url.isNullOrBlank()) {
                                         subtitleCallback.invoke(
                                             newSubtitleFile(
-                                                lang = subtitle.title ?: subtitle.abbreviate ?: "Unknown",
+                                                lang = subtitle.title
+                                                    ?: subtitle.abbreviate
+                                                    ?: "Unknown",
                                                 url = subtitle.url
                                             )
                                         )
@@ -718,4 +720,5 @@ override suspend fun search(query: String): List<SearchResponse> {
     }
 }
 
+}
 }
