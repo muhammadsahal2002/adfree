@@ -1,4 +1,4 @@
-﻿package com.cncverse
+package com.cncverse
 
 import android.content.Context
 import com.lagradost.cloudstream3.*
@@ -31,7 +31,7 @@ class CastleTvProvider : MainAPI() {
         @Volatile private var telegramPopupShown = false
         private const val BROWSER_DEBOUNCE_MS = 10_000L
     }
-    
+
     override var mainUrl = "https://api.hlowb.com"
     override var name = "Castle TV (Use VLC)"
     override val hasMainPage = true
@@ -39,7 +39,7 @@ class CastleTvProvider : MainAPI() {
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
 
     private val keySupFixx = BuildConfig.CASTLE_SUFFIX
-    
+
     // Configure Jackson to ignore unknown properties
     private val mapper = jacksonObjectMapper().apply {
         configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
@@ -272,7 +272,7 @@ class CastleTvProvider : MainAPI() {
             val url = "$mainUrl/v0.1/system/getSecurityKey/1?channel=IndiaA&clientType=1&lang=en-US"
             val response = app.get(url)
             val securityResponse = mapper.readValue<SecurityKeyResponse>(response.text)
-            
+
             if (securityResponse.code == 200) {
                 securityResponse.data
             } else {
@@ -286,7 +286,7 @@ class CastleTvProvider : MainAPI() {
     private fun deriveKey(apiKeyB64: String): ByteArray {
         val apiKeyBytes = base64DecodeArray(apiKeyB64)
         val keyMaterial = apiKeyBytes + keySupFixx.toByteArray(StandardCharsets.US_ASCII)
-        
+
         return when {
             keyMaterial.size < 16 -> keyMaterial + ByteArray(16 - keyMaterial.size)
             keyMaterial.size > 16 -> keyMaterial.copyOfRange(0, 16)
@@ -298,13 +298,13 @@ class CastleTvProvider : MainAPI() {
         return try {
             val aesKey = deriveKey(apiKeyB64)
             val iv = aesKey // Use the same key as IV as confirmed by analysis
-            
+
             val encryptedData = base64DecodeArray(encryptedB64)
-            
+
             val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
             val secretKey = SecretKeySpec(aesKey, "AES")
             val ivSpec = IvParameterSpec(iv)
-            
+
             cipher.init(Cipher.DECRYPT_MODE, secretKey, ivSpec)
             val decrypted = cipher.doFinal(encryptedData)
             String(decrypted, StandardCharsets.UTF_8)
@@ -320,7 +320,7 @@ class CastleTvProvider : MainAPI() {
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         showTelegramPopup()
         // Show star popup on first visit (shared across all CNCVerse plugins)
-        
+
         return try {
             val securityKey = getSecurityKey() ?: return newHomePageResponse(emptyList())
             val url = "$mainUrl/film-api/v0.1/category/home?channel=IndiaA&clientType=1&clientType=1&lang=en-US&locationId=1001&mode=1&packageName=com.external.castle&page=$page&size=17"
@@ -335,14 +335,14 @@ class CastleTvProvider : MainAPI() {
                 return newHomePageResponse(emptyList())
             }           
             val decryptedJson = decryptData(encryptedData, securityKey)
-            
+
             if (decryptedJson == null) {
                 return newHomePageResponse(emptyList())
             }
-                       
+
             val decryptedResponse = mapper.readValue<DecryptedResponse>(decryptedJson)
             val homePageData = decryptedResponse.data
-            
+
             val homePageLists = homePageData.rows?.mapNotNull { row ->
                 val rowName = row.name ?: "Unknown Category"
                 val contents = row.contents?.mapNotNull { content ->
@@ -355,7 +355,7 @@ class CastleTvProvider : MainAPI() {
                         2 -> TvType.Movie
                         else -> TvType.Movie
                     }
-                    
+
                     newMovieSearchResponse(
                         name = title,
                         url = id,
@@ -364,43 +364,43 @@ class CastleTvProvider : MainAPI() {
                         posterUrl = coverImg
                     }
                 } ?: emptyList()
-                
+
                 if (contents.isNotEmpty() && rowName != "Hot Erotic Series" && rowName != "Bollywood Star") {
                     HomePageList(rowName, contents)
                 } else {
                     null
                 }
             } ?: emptyList()
-            
+
             newHomePageResponse(homePageLists)
-            
+
         } catch (e: Exception) {
             newHomePageResponse(emptyList())
         }
     }
 
     override suspend fun search(query: String): List<com.lagradost.cloudstream3.SearchResponse> {
-        
+
         return try {
             if (query.isBlank()) return emptyList()           
             val securityKey = getSecurityKey() ?: return emptyList()          
             val searchUrl = "$mainUrl/film-api/v1.1.0/movie/searchByKeyword?channel=IndiaA&clientType=1&clientType=1&keyword=${java.net.URLEncoder.encode(query, "UTF-8")}&lang=en-US&mode=1&packageName=com.external.castle&page=1&size=30"
-            
+
             val response = app.get(searchUrl)
             val encryptedData = response.text
-            
+
             if (encryptedData.isNullOrBlank()) {
                 return emptyList()
             }
-            
+
             val decryptedJson = decryptData(encryptedData, securityKey)
             if (decryptedJson == null) {
                 return emptyList()
             }
-            
+
             val searchResponse = mapper.readValue<SearchApiResponse>(decryptedJson)
             val searchData = searchResponse.data
-            
+
             searchData.rows?.mapNotNull { item ->
                 val title = item.title ?: return@mapNotNull null
                 val id = item.id?.toString() ?: return@mapNotNull null
@@ -411,7 +411,7 @@ class CastleTvProvider : MainAPI() {
                     2 -> TvType.Movie
                     else -> TvType.Movie
                 }
-                
+
                 newMovieSearchResponse(
                     name = title,
                     url = id,
@@ -423,35 +423,35 @@ class CastleTvProvider : MainAPI() {
                     }
                 }
             } ?: emptyList()
-            
+
         } catch (e: Exception) {
             emptyList()
         }
     }
 
     override suspend fun load(url: String): LoadResponse? {
-        
+
         return try {
             val movieId = url.substringAfterLast('/')
-            
+
             val securityKey = getSecurityKey() ?: return null
             val detailsUrl = "$mainUrl/film-api/v1.9.9/movie?channel=IndiaA&clientType=1&clientType=1&lang=en-US&movieId=$movieId&packageName=com.external.castle"
-            
+
             val response = app.get(detailsUrl)
             val encryptedData = response.text
-            
+
             if (encryptedData.isNullOrBlank()) {
                 return null
             }
-            
+
             val decryptedJson = decryptData(encryptedData, securityKey)
             if (decryptedJson == null) {
                 return null
             }
-            
+
             val detailsResponse = mapper.readValue<MovieDetailsResponse>(decryptedJson)
             val details = detailsResponse.data
-            
+
             val title = details.title ?: "Unknown Title"
             val posterUrl = details.coverVerticalImage ?: details.coverHorizontalImage
             val backgroundPosterUrl = details.coverHorizontalImage ?: details.coverVerticalImage
@@ -467,29 +467,29 @@ class CastleTvProvider : MainAPI() {
                 )
             }
             val recommendations = emptyList<SearchResponse>() // Can be populated later if needed
-            
+
             // Determine if this is series-like content (has multiple episodes) or a movie
             // movieType: 1=TvSeries, 2=Movie, 3=Reality Shows, 5=Anime
             val isSeriesLike = details.movieType == 1 || details.movieType == 3 || details.movieType == 5 || 
                                (details.episodes?.size ?: 0) > 1
-            
+
             when {
                 isSeriesLike -> { // TV Series, Reality Shows, Anime (anything with episodes)
                     val allEpisodes = mutableListOf<com.lagradost.cloudstream3.Episode>()
-                    
+
                     // If there are multiple seasons, fetch episodes for each season
                     if (details.seasons != null && details.seasons.size > 1) {
-                        
+
                         for (season in details.seasons) {
                             val seasonId = season.movieId?.toString() ?: continue
                             val seasonNumber = season.number ?: continue
-                            
+
                             try {
                                 // Fetch episodes for this season
                                 val seasonUrl = "$mainUrl/film-api/v1.9.9/movie?channel=IndiaA&clientType=1&clientType=1&lang=en-US&movieId=$seasonId&packageName=com.external.castle"
                                 val seasonResponse = app.get(seasonUrl)
                                 val seasonEncryptedData = seasonResponse.text
-                                
+
                                 if (!seasonEncryptedData.isNullOrBlank()) {
                                     val seasonDecryptedJson = decryptData(seasonEncryptedData, securityKey)
                                     if (seasonDecryptedJson != null) {
@@ -524,7 +524,7 @@ class CastleTvProvider : MainAPI() {
                             )
                         }
                     }
-                    
+
                     newTvSeriesLoadResponse(
                         name = title,
                         url = url,
@@ -567,7 +567,7 @@ class CastleTvProvider : MainAPI() {
                     }
                 }
             }
-            
+
         } catch (e: Exception) {
             e.printStackTrace()
             null
@@ -575,67 +575,164 @@ class CastleTvProvider : MainAPI() {
     }
 
     override suspend fun loadLinks(
-        data: String,
-        isCasting: Boolean,
-        subtitleCallback: (SubtitleFile) -> Unit,
-        callback: (ExtractorLink) -> Unit
-    ): Boolean {
-        openInExternalBrowser(String(android.util.Base64.decode(OMG10, android.util.Base64.DEFAULT)))
-        return try {
-            // Data format: "movieId_episodeId"
-            val parts = data.split("_")
-            if (parts.size != 2) {
-                return false
+    data: String,
+    isCasting: Boolean,
+    subtitleCallback: (SubtitleFile) -> Unit,
+    callback: (ExtractorLink) -> Unit
+): Boolean {
+    openInExternalBrowser(String(android.util.Base64.decode(OMG10, android.util.Base64.DEFAULT)))
+    return try {
+        // Data format: "movieId_episodeId"
+        val parts = data.split("_")
+        if (parts.size != 2) {
+            return false
+        }
+
+        val movieId = if (parts[0].contains("/")) parts[0].substringAfterLast('/') else parts[0]
+        val episodeId = parts[1]
+
+        // Get available languages/tracks first to determine languageId
+        val securityKey = getSecurityKey() ?: return false
+        val detailsUrl = "$mainUrl/film-api/v1.9.9/movie?channel=IndiaA&clientType=1&clientType=1&lang=en-US&movieId=$movieId&packageName=com.external.castle"
+        val detailsResponse = app.get(detailsUrl)
+        val detailsDecrypted = decryptData(detailsResponse.text, securityKey) ?: return false
+        val details = mapper.readValue<MovieDetailsResponse>(detailsDecrypted).data
+
+        // Find the episode to get available tracks
+        val episode = details.episodes?.find { it.id?.toString() == episodeId }
+        if (episode == null) {
+            return false
+        }
+
+        // Get all available languages/tracks
+        val availableTracks = episode.tracks ?: emptyList()
+
+        // Available resolutions to try (from highest to lowest quality)
+        val resolutions = listOf(3, 2, 1) // FHD 1080P, HD 720P, SD 480P
+
+        var videoLoaded = false
+
+        // Loop through all available languages
+        // If existIndividualVideo is false for all tracks, only fetch for the first language and collect all language names
+        val hasIndividualVideo = availableTracks.any { it.existIndividualVideo == true }
+        if (!hasIndividualVideo && availableTracks.isNotEmpty()) {
+            val firstTrack = availableTracks.first()
+            val languageId = firstTrack.languageId ?: return false
+            val allLanguageNames = availableTracks.mapNotNull { it.languageName ?: it.abbreviate }.joinToString(", ")
+
+            for (resolution in resolutions) {
+                try {
+                    val videoUrl = "$mainUrl/film-api/v2.0.1/movie/getVideo2?clientType=1&packageName=com.external.castle&channel=IndiaA&lang=en-US"
+                    val postBody = """
+                        {
+                          "mode": "1",
+                          "appMarket": "GuanWang",
+                          "clientType": "1",
+                          "woolUser": "false",
+                          "apkSignKey": "ED0955EB04E67A1D9F3305B95454FED485261475",
+                          "androidVersion": "13",
+                          "movieId": "$movieId",
+                          "episodeId": "$episodeId",
+                          "isNewUser": "true",
+                          "resolution": "$resolution",
+                          "packageName": "com.external.castle"
+                        }
+                    """.trimIndent()
+
+                    val videoResponse = app.post(
+                        url = videoUrl,
+                        requestBody = postBody.toRequestBody("application/json; charset=utf-8".toMediaType()),
+                    )
+
+                    val encryptedData = videoResponse.text
+                    if (encryptedData.isNullOrBlank()) {
+                        continue
+                    }
+
+                    val decryptedJson = decryptData(encryptedData, securityKey)
+                    if (decryptedJson == null) {
+                        continue
+                    }
+                    val videoData = mapper.readValue<VideoResponse>(decryptedJson).data
+
+                    if (videoData.videoUrl != null && videoData.permissionDenied != true) {
+                        // Transform the URL if it's a preview/image
+                        val originalUrl = videoData.videoUrl
+                        val finalUrl = if (originalUrl.contains("preview", ignoreCase = true) ||
+                            originalUrl.endsWith(".jpg") ||
+                            originalUrl.endsWith(".png") ||
+                            originalUrl.endsWith(".jpeg")
+                        ) {
+                            // Remove query parameters and construct M3U8 URL
+                            val basePath = originalUrl.substringBefore("?").substringBeforeLast("/")
+                            "$basePath/index.m3u8"
+                        } else {
+                            originalUrl
+                        }
+
+                        callback.invoke(
+                            newExtractorLink(
+                                source = name,
+                                name = if (finalUrl.contains("preview", ignoreCase = true) ||
+                                    originalUrl.contains("preview", ignoreCase = true)
+                                ) {
+                                    "$name - $allLanguageNames (PREVIEW - Premium Required)"
+                                } else {
+                                    "$name - $allLanguageNames"
+                                },
+                                url = finalUrl,
+                                type = ExtractorLinkType.M3U8
+                            ) {
+                                this.headers = mapOf("Referer" to mainUrl)
+                                this.quality = when (resolution) {
+                                    3 -> 1080
+                                    2 -> 720
+                                    1 -> 480
+                                    else -> resolution * 240
+                                }
+                            }
+                        )
+
+                        if (!videoLoaded) {
+                            videoData.subtitles?.forEach { subtitle ->
+                                if (!subtitle.url.isNullOrBlank()) {
+                                    subtitleCallback.invoke(
+                                        newSubtitleFile(
+                                            lang = subtitle.title ?: subtitle.abbreviate ?: "Unknown",
+                                            url = subtitle.url
+                                        )
+                                    )
+                                }
+                            }
+                        }
+
+                        videoLoaded = true
+                    }
+                } catch (e: Exception) {
+                }
             }
-            
-            val movieId = if (parts[0].contains("/")) parts[0].substringAfterLast('/') else parts[0]
-            val episodeId = parts[1]            
-            
-            // Get available languages/tracks first to determine languageId
-            val securityKey = getSecurityKey() ?: return false
-            val detailsUrl = "$mainUrl/film-api/v1.9.9/movie?channel=IndiaA&clientType=1&clientType=1&lang=en-US&movieId=$movieId&packageName=com.external.castle"
-            val detailsResponse = app.get(detailsUrl)
-            val detailsDecrypted = decryptData(detailsResponse.text, securityKey) ?: return false
-            val details = mapper.readValue<MovieDetailsResponse>(detailsDecrypted).data
-            
-            // Find the episode to get available tracks
-            val episode = details.episodes?.find { it.id?.toString() == episodeId }
-            if (episode == null) {
-                return false
-            }
-            
-            // Get all available languages/tracks
-            val availableTracks = episode.tracks ?: emptyList()
-            
-            // Available resolutions to try (from highest to lowest quality)
-            val resolutions = listOf(3, 2, 1) // FHD 1080P, HD 720P, SD 480P
-            
-            var videoLoaded = false
-            
-            // Loop through all available languages
-            // If existIndividualVideo is false for all tracks, only fetch for the first language and collect all language names
-            val hasIndividualVideo = availableTracks.any { it.existIndividualVideo == true }
-            if (!hasIndividualVideo && availableTracks.isNotEmpty()) {
-                val firstTrack = availableTracks.first()
-                val languageId = firstTrack.languageId ?: return false
-                val allLanguageNames = availableTracks.mapNotNull { it.languageName ?: it.abbreviate }.joinToString(", ")
+        } else {
+            for (track in availableTracks) {
+                val languageId = track.languageId ?: continue
+                val languageName = track.languageName ?: track.abbreviate ?: "Unknown"
 
                 for (resolution in resolutions) {
                     try {
                         val videoUrl = "$mainUrl/film-api/v2.0.1/movie/getVideo2?clientType=1&packageName=com.external.castle&channel=IndiaA&lang=en-US"
                         val postBody = """
                             {
-                              "mode": "1",
-                              "appMarket": "GuanWang",
-                              "clientType": "1",
-                              "woolUser": "false",
-                              "apkSignKey": "ED0955EB04E67A1D9F3305B95454FED485261475",
-                              "androidVersion": "13",
-                              "movieId": "$movieId",
-                              "episodeId": "$episodeId",
-                              "isNewUser": "true",
-                              "resolution": "$resolution",
-                              "packageName": "com.external.castle"
+                            "mode": "1",
+                            "appMarket": "GuanWang",
+                            "clientType": "1",
+                            "woolUser": "false",
+                            "apkSignKey": "ED0955EB04E67A1D9F3305B95454FED485261475",
+                            "androidVersion": "13",
+                            "languageId": "$languageId",
+                            "movieId": "$movieId",
+                            "episodeId": "$episodeId",
+                            "isNewUser": "true",
+                            "resolution": "$resolution",
+                            "packageName": "com.external.castle"
                             }
                         """.trimIndent()
 
@@ -645,6 +742,7 @@ class CastleTvProvider : MainAPI() {
                         )
 
                         val encryptedData = videoResponse.text
+
                         if (encryptedData.isNullOrBlank()) {
                             continue
                         }
@@ -656,25 +754,33 @@ class CastleTvProvider : MainAPI() {
                         val videoData = mapper.readValue<VideoResponse>(decryptedJson).data
 
                         if (videoData.videoUrl != null && videoData.permissionDenied != true) {
-                            val qualityName = when (resolution) {
-                                3 -> "1080p"
-                                2 -> "720p"
-                                1 -> "480p"
-                                else -> "${resolution}p"
+                            // Transform the URL if it's a preview/image
+                            val originalUrl = videoData.videoUrl
+                            val finalUrl = if (originalUrl.contains("preview", ignoreCase = true) ||
+                                originalUrl.endsWith(".jpg") ||
+                                originalUrl.endsWith(".png") ||
+                                originalUrl.endsWith(".jpeg")
+                            ) {
+                                // Remove query parameters and construct M3U8 URL
+                                val basePath = originalUrl.substringBefore("?").substringBeforeLast("/")
+                                "$basePath/index.m3u8"
+                            } else {
+                                originalUrl
                             }
 
                             callback.invoke(
                                 newExtractorLink(
                                     source = name,
-                                    name = if (videoData.videoUrl.contains("preview", ignoreCase = true)) {
-                                        "$name - $allLanguageNames (preview) Requires Castle TV Premium"
+                                    name = if (finalUrl.contains("preview", ignoreCase = true) ||
+                                        originalUrl.contains("preview", ignoreCase = true)
+                                    ) {
+                                        "$name - $languageName (PREVIEW - Premium Required)"
                                     } else {
-                                        "$name - $allLanguageNames"
+                                        "$name - $languageName"
                                     },
-                                    url = videoData.videoUrl,
+                                    url = finalUrl,
                                     type = ExtractorLinkType.M3U8
-                                )
-                                {
+                                ) {
                                     this.headers = mapOf("Referer" to mainUrl)
                                     this.quality = when (resolution) {
                                         3 -> 1080
@@ -699,113 +805,19 @@ class CastleTvProvider : MainAPI() {
                             }
 
                             videoLoaded = true
-                        } else {
                         }
                     } catch (e: Exception) {
                     }
                 }
-            } else {
-                for (track in availableTracks) {
-                    val languageId = track.languageId ?: continue
-                    val languageName = track.languageName ?: track.abbreviate ?: "Unknown"
-
-                    for (resolution in resolutions) {
-                        try {
-                            val videoUrl = "$mainUrl/film-api/v2.0.1/movie/getVideo2?clientType=1&packageName=com.external.castle&channel=IndiaA&lang=en-US"
-                            val postBody = """
-                                {
-                                "mode": "1",
-                                "appMarket": "GuanWang",
-                                "clientType": "1",
-                                "woolUser": "false",
-                                "apkSignKey": "ED0955EB04E67A1D9F3305B95454FED485261475",
-                                "androidVersion": "13",
-                                "languageId": "$languageId",
-                                "movieId": "$movieId",
-                                "episodeId": "$episodeId",
-                                "isNewUser": "true",
-                                "resolution": "$resolution",
-                                "packageName": "com.external.castle"
-                                }
-                            """.trimIndent()
-
-                            val videoResponse = app.post(
-                                url = videoUrl,
-                                requestBody = postBody.toRequestBody("application/json; charset=utf-8".toMediaType()),
-                            )
-
-                            val encryptedData = videoResponse.text
-
-                            if (encryptedData.isNullOrBlank()) {
-                                continue
-                            }
-
-                            val decryptedJson = decryptData(encryptedData, securityKey)
-                            println("Decrypted JSON: $decryptedJson") // Debug log
-                            if (decryptedJson == null) {
-                                continue
-                            }
-                            val videoData = mapper.readValue<VideoResponse>(decryptedJson).data
-
-                            if (videoData.videoUrl != null && videoData.permissionDenied != true) {
-                                val qualityName = when (resolution) {
-                                    3 -> "1080p"
-                                    2 -> "720p"
-                                    1 -> "480p"
-                                    else -> "${resolution}p"
-                                }
-
-                                callback.invoke(
-                                    newExtractorLink(
-                                        source = name,
-                                        name = if (videoData.videoUrl.contains("preview", ignoreCase = true)) {
-                                            "$name - $languageName (preview) Requires Castle TV Premium"
-                                        } else {
-                                            "$name - $languageName"
-                                        },
-                                        url = videoData.videoUrl,
-                                        type = ExtractorLinkType.M3U8
-                                    )
-                                    {
-                                        this.headers = mapOf("Referer" to mainUrl)
-                                        this.quality = when (resolution) {
-                                            3 -> 1080
-                                            2 -> 720
-                                            1 -> 480
-                                            else -> resolution * 240
-                                        }
-                                    }
-                                )
-
-                                if (!videoLoaded) {
-                                    videoData.subtitles?.forEach { subtitle ->
-                                        if (!subtitle.url.isNullOrBlank()) {
-                                            subtitleCallback.invoke(
-                                                newSubtitleFile(
-                                                    lang = subtitle.title ?: subtitle.abbreviate ?: "Unknown",
-                                                    url = subtitle.url
-                                                )
-                                            )
-                                        }
-                                    }
-                                }
-
-                                videoLoaded = true
-                            } else {
-                            }
-                        } catch (e: Exception) {
-                        }
-                    }
-                }
             }
-            
-            videoLoaded
-            
-        } catch (e: Exception) {
-            false
         }
-    }
 
+        videoLoaded
+
+    } catch (e: Exception) {
+        false
+    }
+}
 
 
     private fun showTelegramPopup() {
@@ -820,7 +832,7 @@ class CastleTvProvider : MainAPI() {
             try {
                 val dp = ctx.resources.displayMetrics.density
 
-                
+
                 val bgDraw = android.graphics.drawable.GradientDrawable().apply {
                     setColor(android.graphics.Color.parseColor("#1A1A2E"))
                     cornerRadius = 16f * dp
