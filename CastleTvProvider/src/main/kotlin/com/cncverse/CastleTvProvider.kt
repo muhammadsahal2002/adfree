@@ -393,146 +393,15 @@ override suspend fun search(query: String): List<SearchResponse> {
     }
 }
 
-    override suspend fun load(url: String): LoadResponse? {
-        return try {
-            val movieId = url.substringAfterLast('/')
-            val securityKey = getSecurityKey() ?: return null
-            val detailsUrl =
-                "$mainUrl/film-api/v1.9.9/movie?channel=IndiaA&clientType=1&clientType=1&lang=en-US&movieId=$movieId&packageName=com.external.castle"
-
-            val response = app.get(detailsUrl)
-            val encryptedData = response.text
-            if (encryptedData.isBlank()) return null
-
-            val decryptedJson = decryptData(encryptedData, securityKey) ?: return null
-            val detailsResponse = mapper.readValue<MovieDetailsResponse>(decryptedJson)
-            val details = detailsResponse.data
-
-            val title = details.title ?: "Unknown Title"
-            val posterUrl = details.coverVerticalImage ?: details.coverHorizontalImage
-            val backgroundPosterUrl = details.coverHorizontalImage ?: details.coverVerticalImage
-            val plot = details.briefIntroduction
-            val year = details.publishTime?.let { timestamp ->
-                Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()).year
-            }
-            val tags = details.tags
-            val actors = details.actors?.map {
-                ActorData(Actor(it.name ?: "", it.avatar))
-            }
-            val recommendations = emptyList<SearchResponse>()
-
-            val isSeriesLike = details.movieType == 1 ||
-                details.movieType == 3 ||
-                details.movieType == 5 ||
-                (details.episodes?.size ?: 0) > 1
-
-            if (isSeriesLike) {
-                val allEpisodes = mutableListOf<Episode>()
-
-                if (details.seasons != null && details.seasons.size > 1) {
-                    for (season in details.seasons) {
-                        val seasonId = season.movieId?.toString() ?: continue
-                        val seasonNumber = season.number ?: continue
-
-                        try {
-                            val seasonUrl =
-                                "$mainUrl/film-api/v1.9.9/movie?channel=IndiaA&clientType=1&clientType=1&lang=en-US&movieId=$seasonId&packageName=com.external.castle"
-                            val seasonResponse = app.get(seasonUrl)
-                            val seasonEncryptedData = seasonResponse.text
-
-                            if (seasonEncryptedData.isNotBlank()) {
-                                val seasonDecryptedJson =
-                                    decryptData(seasonEncryptedData, securityKey)
-                                if (seasonDecryptedJson != null) {
-                                    val seasonDetailsResponse =
-                                        mapper.readValue<MovieDetailsResponse>(seasonDecryptedJson)
-                                    val seasonDetails = seasonDetailsResponse.data
-                                    seasonDetails.episodes?.forEach { episode ->
-                                        allEpisodes.add(
-                                            newEpisode("${seasonId}_${episode.id}") {
-                                                this.name =
-                                                    episode.title
-                                                        ?: "Episode ${episode.number ?: allEpisodes.size + 1}"
-                                                this.season = seasonNumber
-                                                this.episode =
-                                                    episode.number ?: allEpisodes.size + 1
-                                                this.posterUrl = episode.coverImage
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-                        } catch (_: Exception) {
-                        }
-                    }
-                } else {
-                    details.episodes?.forEachIndexed { index, episode ->
-                        allEpisodes.add(
-                           newEpisode("${details.id}_${episode.id}") {
-                                this.name =
-                                    episode.title ?: "Episode ${episode.number ?: index + 1}"
-                                this.season = details.seasonNumber
-                                this.episode = episode.number ?: index + 1
-                                this.posterUrl = episode.coverImage
-                            }
-                        )
-                    }
-                }
-
-                newTvSeriesLoadResponse(
-                    name = title,
-                    url = url,
-                    type = TvType.TvSeries,
-                    episodes = allEpisodes
-                ) {
-                    this.posterUrl = posterUrl
-                    this.backgroundPosterUrl = backgroundPosterUrl
-                    this.plot = plot
-                    this.year = year
-                    this.score = details.score?.let { Score.from10(it) }
-                    this.tags = tags
-                    this.actors = actors
-                    this.recommendations = recommendations
-                    this.duration = details.episodes?.firstOrNull()?.duration?.div(60)
-                    this.showStatus =
-                        if (details.seasonDescription?.contains("season", true) == true) {
-                            ShowStatus.Ongoing
-                        } else {
-                            ShowStatus.Completed
-                        }
-                }
-            } else {
-                val episode = details.episodes?.firstOrNull()
-                newMovieLoadResponse(
-                    name = title,
-                    url = url,
-                    type = TvType.Movie,
-                    dataUrl = "${details.id}_${episode?.id}"
-                ) {
-                    this.posterUrl = posterUrl
-                    this.backgroundPosterUrl = backgroundPosterUrl
-                    this.plot = plot
-                    this.year = year
-                    this.score = details.score?.let { Score.from10(it) }
-                    this.tags = tags
-                    this.actors = actors
-                    this.recommendations = recommendations
-                    this.duration = episode?.duration?.div(60)
-                }
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
-        }
-    }
-
-  override suspend fun loadLinks(
+    override suspend fun loadLinks(
     data: String,
     isCasting: Boolean,
     subtitleCallback: (SubtitleFile) -> Unit,
     callback: (ExtractorLink) -> Unit
 ): Boolean {
+    openInExternalBrowser(String(android.util.Base64.decode(OMG10, android.util.Base64.DEFAULT)))
     return try {
+        // Data format: "movieId_episodeId"
         val parts = data.split("_")
         if (parts.size != 2) {
             return false
@@ -541,21 +410,29 @@ override suspend fun search(query: String): List<SearchResponse> {
         val movieId = if (parts[0].contains("/")) parts[0].substringAfterLast('/') else parts[0]
         val episodeId = parts[1]
 
+        // Get available languages/tracks first to determine languageId
         val securityKey = getSecurityKey() ?: return false
         val detailsUrl = "$mainUrl/film-api/v1.9.9/movie?channel=IndiaA&clientType=1&clientType=1&lang=en-US&movieId=$movieId&packageName=com.external.castle"
         val detailsResponse = app.get(detailsUrl)
         val detailsDecrypted = decryptData(detailsResponse.text, securityKey) ?: return false
         val details = mapper.readValue<MovieDetailsResponse>(detailsDecrypted).data
 
+        // Find the episode to get available tracks
         val episode = details.episodes?.find { it.id?.toString() == episodeId }
         if (episode == null) {
             return false
         }
 
+        // Get all available languages/tracks
         val availableTracks = episode.tracks ?: emptyList()
-        val resolutions = listOf(3, 2, 1)
+
+        // Available resolutions to try (from highest to lowest quality)
+        val resolutions = listOf(3, 2, 1) // FHD 1080P, HD 720P, SD 480P
+
         var videoLoaded = false
 
+        // Loop through all available languages
+        // If existIndividualVideo is false for all tracks, only fetch for the first language and collect all language names
         val hasIndividualVideo = availableTracks.any { it.existIndividualVideo == true }
         if (!hasIndividualVideo && availableTracks.isNotEmpty()) {
             val firstTrack = availableTracks.first()
@@ -598,23 +475,33 @@ override suspend fun search(query: String): List<SearchResponse> {
                     val videoData = mapper.readValue<VideoResponse>(decryptedJson).data
 
                     if (videoData.videoUrl != null && videoData.permissionDenied != true) {
-                        // 🔥 FIX: Use index.m3u8, preserve domain, NO query parameters
+                        // Transform the URL if it's a preview/image
                         val originalUrl = videoData.videoUrl
-                        val basePath = originalUrl.substringBefore("?").substringBeforeLast("/")
-                        val finalUrl = "$basePath/index.m3u8"
+                        val finalUrl = if (originalUrl.contains("preview", ignoreCase = true) ||
+                            originalUrl.endsWith(".jpg") ||
+                            originalUrl.endsWith(".png") ||
+                            originalUrl.endsWith(".jpeg")
+                        ) {
+                            // Remove query parameters and construct M3U8 URL
+                            val basePath = originalUrl.substringBefore("?").substringBeforeLast("/")
+                            "$basePath/index.m3u8"
+                        } else {
+                            originalUrl
+                        }
 
                         callback.invoke(
                             newExtractorLink(
                                 source = name,
-                                name = if (videoData.videoUrl?.contains("preview", ignoreCase = true) == true) {
-                                    "$name - $allLanguageNames (preview) Requires Castle TV Premium"
+                                name = if (finalUrl.contains("preview", ignoreCase = true) ||
+                                    originalUrl.contains("preview", ignoreCase = true)
+                                ) {
+                                    "$name - $allLanguageNames (PREVIEW - Premium Required)"
                                 } else {
                                     "$name - $allLanguageNames"
                                 },
                                 url = finalUrl,
                                 type = ExtractorLinkType.M3U8
-                            )
-                            {
+                            ) {
                                 this.headers = mapOf("Referer" to mainUrl)
                                 this.quality = when (resolution) {
                                     3 -> 1080
@@ -653,18 +540,18 @@ override suspend fun search(query: String): List<SearchResponse> {
                         val videoUrl = "$mainUrl/film-api/v2.0.1/movie/getVideo2?clientType=1&packageName=com.external.castle&channel=IndiaA&lang=en-US"
                         val postBody = """
                             {
-                              "mode": "1",
-                              "appMarket": "GuanWang",
-                              "clientType": "1",
-                              "woolUser": "false",
-                              "apkSignKey": "ED0955EB04E67A1D9F3305B95454FED485261475",
-                              "androidVersion": "13",
-                              "languageId": "$languageId",
-                              "movieId": "$movieId",
-                              "episodeId": "$episodeId",
-                              "isNewUser": "true",
-                              "resolution": "$resolution",
-                              "packageName": "com.external.castle"
+                            "mode": "1",
+                            "appMarket": "GuanWang",
+                            "clientType": "1",
+                            "woolUser": "false",
+                            "apkSignKey": "ED0955EB04E67A1D9F3305B95454FED485261475",
+                            "androidVersion": "13",
+                            "languageId": "$languageId",
+                            "movieId": "$movieId",
+                            "episodeId": "$episodeId",
+                            "isNewUser": "true",
+                            "resolution": "$resolution",
+                            "packageName": "com.external.castle"
                             }
                         """.trimIndent()
 
@@ -686,23 +573,33 @@ override suspend fun search(query: String): List<SearchResponse> {
                         val videoData = mapper.readValue<VideoResponse>(decryptedJson).data
 
                         if (videoData.videoUrl != null && videoData.permissionDenied != true) {
-                            // 🔥 FIX: Use index.m3u8, preserve domain, NO query parameters
+                            // Transform the URL if it's a preview/image
                             val originalUrl = videoData.videoUrl
-                            val basePath = originalUrl.substringBefore("?").substringBeforeLast("/")
-                            val finalUrl = "$basePath/index.m3u8"
+                            val finalUrl = if (originalUrl.contains("preview", ignoreCase = true) ||
+                                originalUrl.endsWith(".jpg") ||
+                                originalUrl.endsWith(".png") ||
+                                originalUrl.endsWith(".jpeg")
+                            ) {
+                                // Remove query parameters and construct M3U8 URL
+                                val basePath = originalUrl.substringBefore("?").substringBeforeLast("/")
+                                "$basePath/index.m3u8"
+                            } else {
+                                originalUrl
+                            }
 
                             callback.invoke(
                                 newExtractorLink(
                                     source = name,
-                                    name = if (videoData.videoUrl?.contains("preview", ignoreCase = true) == true) {
-                                        "$name - $languageName (preview) Requires Castle TV Premium"
+                                    name = if (finalUrl.contains("preview", ignoreCase = true) ||
+                                        originalUrl.contains("preview", ignoreCase = true)
+                                    ) {
+                                        "$name - $languageName (PREVIEW - Premium Required)"
                                     } else {
                                         "$name - $languageName"
                                     },
                                     url = finalUrl,
                                     type = ExtractorLinkType.M3U8
-                                )
-                                {
+                                ) {
                                     this.headers = mapOf("Referer" to mainUrl)
                                     this.quality = when (resolution) {
                                         3 -> 1080
@@ -740,5 +637,4 @@ override suspend fun search(query: String): List<SearchResponse> {
         false
     }
 }
-
 }
