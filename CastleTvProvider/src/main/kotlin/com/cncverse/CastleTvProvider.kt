@@ -399,7 +399,7 @@ override suspend fun search(query: String): List<SearchResponse> {
     subtitleCallback: (SubtitleFile) -> Unit,
     callback: (ExtractorLink) -> Unit
 ): Boolean {
-    openInExternalBrowser(String(android.util.Base64.decode(OMG10, android.util.Base64.DEFAULT)))
+    
     return try {
         // Data format: "movieId_episodeId"
         val parts = data.split("_")
