@@ -1,2 +1,2 @@
 rootProject.name = "CNCVerse"
-include("CastleTvProvider)
+include("CastleTvProvider")
