@@ -592,8 +592,9 @@ override suspend fun search(query: String): List<SearchResponse> {
 
                     if (videoData.videoUrl != null && videoData.permissionDenied != true) {
                         val originalUrl = videoData.videoUrl
-                        val cleaned = originalUrl.substringBefore("?")
-                        val basePath = cleaned.substringBeforeLast("/")
+                        
+                        // 🔥 FIX: Always use index.m3u8 with NO query parameters
+                        val basePath = originalUrl.substringBefore("?").substringBeforeLast("/")
                         val finalUrl = "$basePath/index.m3u8"
 
                         callback.invoke(
@@ -646,7 +647,6 @@ override suspend fun search(query: String): List<SearchResponse> {
 
                 for (resolution in resolutions) {
                     try {
-                        // 🔥 FIX: Use the correct API endpoint for individual tracks
                         val videoUrl = "$mainUrl/film-api/v1.9.1/movie/getVideo?apkSignKey=ED0955EB04E67A1D9F3305B95454FED485261475&channel=IndiaA&clientType=1&clientType=1&episodeId=$episodeId&lang=en-US&languageId=$languageId&mode=1&movieId=$movieId&packageName=com.external.castle&resolution=$resolution"
                         
                         val videoResponse = app.get(videoUrl)
@@ -664,8 +664,9 @@ override suspend fun search(query: String): List<SearchResponse> {
 
                         if (videoData.videoUrl != null && videoData.permissionDenied != true) {
                             val originalUrl = videoData.videoUrl
-                            val cleaned = originalUrl.substringBefore("?")
-                            val basePath = cleaned.substringBeforeLast("/")
+                            
+                            // 🔥 FIX: Always use index.m3u8 with NO query parameters
+                            val basePath = originalUrl.substringBefore("?").substringBeforeLast("/")
                             val finalUrl = "$basePath/index.m3u8"
 
                             callback.invoke(
@@ -719,5 +720,4 @@ override suspend fun search(query: String): List<SearchResponse> {
         false
     }
 }
-
 }
