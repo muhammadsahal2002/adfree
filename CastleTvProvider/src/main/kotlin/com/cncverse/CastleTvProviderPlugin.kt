@@ -10,3 +10,5 @@ class CastleTvProviderPlugin : Plugin() {
         registerMainAPI(CastleTvProvider())
     }
 }
+
+/nothing
