@@ -348,49 +348,50 @@ class CastleTvProvider : MainAPI() {
         }
     }
 
-    override suspend fun search(query: String): List<SearchResponse> {
-        return try {
-            if (query.isBlank()) return emptyList()
+override suspend fun search(query: String): List<SearchResponse> {
+    return try {
+        if (query.isBlank()) return emptyList()
 
-            val securityKey = getSecurityKey() ?: return emptyList()
-            val searchUrl =
-                "\( mainUrl/film-api/v1.1.0/movie/searchByKeyword?channel=IndiaA&clientType=1&clientType=1&keyword= \){
-                    java.net.URLEncoder.encode(query, "UTF-8")
-                }&lang=en-US&mode=1&packageName=com.external.castle&page=1&size=30"
+        val securityKey = getSecurityKey() ?: return emptyList()
+        val encoded = java.net.URLEncoder.encode(query, "UTF-8")
+        val searchUrl =
+            "$mainUrl/film-api/v1.1.0/movie/searchByKeyword?channel=IndiaA&clientType=1&clientType=1&keyword=$encoded&lang=en-US&mode=1&packageName=com.external.castle&page=1&size=30"
 
-            val response = app.get(searchUrl)
-            val encryptedData = response.text
-            if (encryptedData.isBlank()) return emptyList()
+        val response = app.get(searchUrl)
+        val encryptedData = response.text
+        if (encryptedData.isBlank()) return emptyList()
 
-            val decryptedJson = decryptData(encryptedData, securityKey) ?: return emptyList()
-            val searchResponse = mapper.readValue<SearchApiResponse>(decryptedJson)
-            val searchData = searchResponse.data
+        val decryptedJson = decryptData(encryptedData, securityKey) ?: return emptyList()
+        val searchResponse = mapper.readValue<SearchApiResponse>(decryptedJson)
+        val searchData = searchResponse.data
 
-            searchData.rows?.mapNotNull { item ->
-                val title = item.title ?: return@mapNotNull null
-                val id = item.id?.toString() ?: return@mapNotNull null
-                val posterUrl = item.coverVerticalImage ?: item.coverHorizontalImage
-                val type = when (item.movieType) {
-                    1, 3, 5 -> TvType.TvSeries
-                    2 -> TvType.Movie
-                    else -> TvType.Movie
+        searchData.rows?.mapNotNull { item ->
+            val title = item.title ?: return@mapNotNull null
+            val id = item.id?.toString() ?: return@mapNotNull null
+            val posterUrl = item.coverVerticalImage ?: item.coverHorizontalImage
+            val type = when (item.movieType) {
+                1, 3, 5 -> TvType.TvSeries
+                2 -> TvType.Movie
+                else -> TvType.Movie
+            }
+
+            newMovieSearchResponse(
+                name = title,
+                url = id,
+                type = type
+            ) {
+                this.posterUrl = posterUrl
+                this.year = item.publishTime?.let { timestamp ->
+                    Instant.ofEpochMilli(timestamp)
+                        .atZone(ZoneId.systemDefault())
+                        .year
                 }
-
-                newMovieSearchResponse(
-                    name = title,
-                    url = id,
-                    type = type
-                ) {
-                    this.posterUrl = posterUrl
-                    this.year = item.publishTime?.let { timestamp ->
-                        Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()).year
-                    }
-                }
-            } ?: emptyList()
-        } catch (e: Exception) {
-            emptyList()
-        }
+            }
+        } ?: emptyList()
+    } catch (e: Exception) {
+        emptyList()
     }
+}
 
     override suspend fun load(url: String): LoadResponse? {
         return try {
