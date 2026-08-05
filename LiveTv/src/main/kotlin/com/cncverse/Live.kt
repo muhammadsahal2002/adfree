@@ -1,9 +1,17 @@
 package com.cncverse
 
 import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.plugins.BasePlugin
+import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
 import com.lagradost.cloudstream3.utils.*
 import org.jsoup.nodes.Document
-import org.jsoup.nodes.Element
+
+@CloudstreamPlugin
+class ICCFTPServerPlugin : BasePlugin() {
+    override fun load() {
+        registerMainAPI(ICCFTPServerProvider())
+    }
+}
 
 class ICCFTPServerProvider : MainAPI() {
     override var mainUrl = "http://10.16.100.244"
@@ -169,11 +177,9 @@ class ICCFTPServerProvider : MainAPI() {
             // Ignore tracking errors
         }
         
-        // Get the modal content by requesting the page and parsing the modal
         val playerUrl = "$mainUrl/player.php?session=$session&play=$id"
         val document = app.get(playerUrl, headers = getHeaders()).document
 
-        // The modal content is in the page
         val modal = document.select(".modal-dialog")
         val sources = mutableListOf<ExtractorLink>()
         var title = ""
@@ -220,7 +226,7 @@ class ICCFTPServerProvider : MainAPI() {
             if (href.isNotBlank() && (href.contains(".mp4") || href.contains(".mkv"))) {
                 val quality = extractQuality(href) ?: QUALITY_UNKNOWN
                 
-                // Track download if needed
+                // Track download
                 try {
                     app.post(
                         "$mainUrl/command.php",
@@ -314,7 +320,6 @@ class ICCFTPServerProvider : MainAPI() {
         val episodes = mutableListOf<Episode>()
         val seenIds = mutableSetOf<String>()
         
-        // Parse from related content in the player page
         document.select(".post").forEach { post ->
             val link = post.select("a.image").attr("href")
             val title = post.select(".title").text()
@@ -324,7 +329,6 @@ class ICCFTPServerProvider : MainAPI() {
                 if (epId.isNotBlank() && epId != currentId && !seenIds.contains(epId)) {
                     seenIds.add(epId)
                     
-                    // Extract season/episode numbers
                     val seasonMatch = Regex("Season\\s*(\\d+)", RegexOption.IGNORE_CASE).find(title)
                     val episodeMatch = Regex("Episode\\s*(\\d+)", RegexOption.IGNORE_CASE).find(title)
                     val sxeMatch = Regex("S(\\d+)E(\\d+)", RegexOption.IGNORE_CASE).find(title)
@@ -354,7 +358,6 @@ class ICCFTPServerProvider : MainAPI() {
         return episodes.sortedWith(compareBy<Episode> { it.season }.thenBy { it.episode })
     }
 
-    // Session Management
     private suspend fun getSession(): String {
         currentSession?.let { return it }
         
