@@ -48,94 +48,99 @@ class ICCFTPServerProvider : MainAPI() {
         val session = getSession()
         val url = "$mainUrl/dashboard.php?session=$session&category=0"
         val document = app.get(url, headers = getHeaders()).document
-
         val home = ArrayList<HomePageList>()
-        val homeList = mutableListOf<SearchResponse>()
 
         // Featured slider
-        document.select(".slider.multipost .item").forEach { item ->
-            val link = item.select("a").attr("href")
-            val title = item.select(".title span").text()
-            val image = item.select(".img").attr("style")
-                .substringAfter("url('").substringBefore("')")
+        val featured = mutableListOf<SearchResponse>()
+        document.select(".slider.multipost a[href*='play='], #post-slider-multipost a[href*='play=']")
+            .forEach { a ->
+                val href = a.attr("href")
+                val id = href.substringAfter("play=").substringBefore("&")
+                if (id.isBlank()) return@forEach
 
-            if (link.isNotBlank() && title.isNotBlank()) {
-                val id = link.substringAfter("play=").substringBefore("&")
-                homeList.add(
-                    newMovieSearchResponse(title, createLink(id)) {
-                        this.posterUrl =
-                            if (image.startsWith("http")) image else "$mainUrl/$image"
-                    }
-                )
-            }
-        }
-
-        // Categories
-        document.select(".navbar-nav > li.dropdown").forEach { category ->
-            val categoryName = category.select("> a").text().replace(" ↓", "")
-            if (categoryName.isNotBlank()) {
-                val items = mutableListOf<SearchResponse>()
-
-                category.select(".dropdown-menu li a").forEach { subItem ->
-                    val fullText = subItem.text()
-                    val subTitle = fullText.substringBefore(" <b")
-                    val subLink = subItem.attr("href")
-
-                    if (subLink.isNotBlank() && subTitle.isNotBlank()) {
-                        val categoryId =
-                            subLink.substringAfter("category=").substringBefore("&")
-                        items.add(
-                            newMovieSearchResponse(
-                                subTitle,
-                                "$mainUrl/dashboard.php?category=$categoryId"
-                            ) {
-                                this.posterUrl = ""
-                            }
-                        )
-                    }
+                val title = a.select(".title span, .title").text().ifBlank {
+                    a.select("img").attr("alt")
                 }
+                val style = a.select(".img").attr("style")
+                val image = style.substringAfter("url('").substringBefore("')")
+                    .ifBlank { a.select("img").attr("src") }
 
-                if (items.isNotEmpty()) {
-                    home.add(HomePageList(categoryName, items))
-                }
-            }
-        }
-
-        // Latest
-        val trendingItems = mutableListOf<SearchResponse>()
-        document.select(".news-gallery .post").take(20).forEach { post ->
-            val link = post.select("a.image").attr("href")
-            val title = post.select(".title").text()
-            val image = post.select(".image img").attr("src")
-
-            if (link.isNotBlank() && title.isNotBlank()) {
-                val id = link.substringAfter("play=").substringBefore("&")
-                if (id.isNotBlank()) {
-                    trendingItems.add(
+                if (title.isNotBlank()) {
+                    featured.add(
                         newMovieSearchResponse(title, createLink(id)) {
-                            this.posterUrl =
-                                if (image.startsWith("http")) image else "$mainUrl/$image"
+                            this.posterUrl = fixImage(image)
                         }
                     )
                 }
             }
+        if (featured.isNotEmpty()) {
+            home.add(HomePageList("Featured", featured.distinctBy { it.url }))
         }
 
-        if (trendingItems.isNotEmpty()) {
-            home.add(0, HomePageList("Latest Releases", trendingItems))
+        // Latest posts
+        val latest = mutableListOf<SearchResponse>()
+        document.select(".post a.image[href*='play='], .post-wrapper > a[href*='play=']")
+            .forEach { a ->
+                val href = a.attr("href")
+                val id = href.substringAfter("play=").substringBefore("&")
+                if (id.isBlank()) return@forEach
+
+                val post = a.closest(".post")
+                val title = post?.select(".title")?.text()?.ifBlank {
+                    a.select("img").attr("alt")
+                } ?: a.select("img").attr("alt")
+
+                val image = a.select("img").attr("src")
+                if (title.isNotBlank()) {
+                    latest.add(
+                        newMovieSearchResponse(title, createLink(id)) {
+                            this.posterUrl = fixImage(image)
+                        }
+                    )
+                }
+            }
+        if (latest.isNotEmpty()) {
+            home.add(0, HomePageList("Latest Releases", latest.distinctBy { it.url }.take(40)))
         }
-        if (homeList.isNotEmpty()) {
-            home.add(1, HomePageList("Featured", homeList))
+
+        // Categories
+        document.select(".navbar-nav > li.dropdown").forEach { category ->
+            val categoryName = category.select("> a.dropdown-toggle").text().trim()
+            if (categoryName.isBlank()) return@forEach
+
+            val items = mutableListOf<SearchResponse>()
+            category.select(".dropdown-menu li a[href*='category=']").forEach { sub ->
+                val subLink = sub.attr("href")
+                val categoryId = subLink.substringAfter("category=").substringBefore("&")
+                // ownText avoids badge numbers
+                val subTitle = sub.ownText().trim().ifBlank {
+                    sub.text().replace(Regex("\\d+\\s*$"), "").trim()
+                }
+
+                if (categoryId.isNotBlank() && subTitle.isNotBlank()) {
+                    items.add(
+                        newMovieSearchResponse(
+                            subTitle,
+                            "$mainUrl/dashboard.php?session=$session&category=$categoryId"
+                        )
+                    )
+                }
+            }
+            if (items.isNotEmpty()) {
+                home.add(HomePageList(categoryName, items))
+            }
         }
 
         return newHomePageResponse(home)
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
+        if (query.isBlank()) return emptyList()
+
         val session = getSession()
         val token = getToken(session)
 
-        val url = "$mainUrl/dashboard.php?session=$session&category=0"
+        val url = "$mainUrl/dashboard.php?session=$session"
         val response = app.post(
             url,
             data = mapOf(
@@ -143,46 +148,50 @@ class ICCFTPServerProvider : MainAPI() {
                 "psearch" to query
             ),
             headers = getHeaders() + mapOf(
-                "Content-Type" to "application/x-www-form-urlencoded"
+                "Content-Type" to "application/x-www-form-urlencoded",
+                "Origin" to mainUrl,
+                "Referer" to url
             )
         )
 
-        val document = response.document
         val results = mutableListOf<SearchResponse>()
+        response.document.select(".post a.image[href*='play='], .post-wrapper > a[href*='play=']")
+            .forEach { a ->
+                val href = a.attr("href")
+                val id = href.substringAfter("play=").substringBefore("&")
+                if (id.isBlank()) return@forEach
 
-        document.select(".news-gallery .post").forEach { post ->
-            val link = post.select("a.image").attr("href")
-            val title = post.select(".title").text()
-            val image = post.select(".image img").attr("src")
+                val post = a.closest(".post")
+                val title = post?.select(".title")?.text()?.ifBlank {
+                    a.select("img").attr("alt")
+                } ?: a.select("img").attr("alt")
 
-            if (link.isNotBlank() && title.isNotBlank()) {
-                val id = link.substringAfter("play=").substringBefore("&")
-                if (id.isNotBlank()) {
+                val image = a.select("img").attr("src")
+                if (title.isNotBlank()) {
                     results.add(
                         newMovieSearchResponse(title, createLink(id)) {
-                            this.posterUrl =
-                                if (image.startsWith("http")) image else "$mainUrl/$image"
+                            this.posterUrl = fixImage(image)
                         }
                     )
                 }
             }
-        }
 
-        return results
+        return results.distinctBy { it.url }
     }
 
     override suspend fun load(url: String): LoadResponse {
+        // Category browse page
+        if (url.contains("category=")) {
+            return loadCategory(url)
+        }
+
         val id = extractId(url)
         val session = getSession()
 
-        // Track view
         try {
             app.post(
                 "$mainUrl/command.php",
-                data = mapOf(
-                    "id" to id,
-                    "type" to "visit"
-                ),
+                data = mapOf("id" to id, "type" to "visit"),
                 headers = getHeaders() + mapOf(
                     "Content-Type" to "application/x-www-form-urlencoded; charset=UTF-8"
                 )
@@ -192,9 +201,11 @@ class ICCFTPServerProvider : MainAPI() {
 
         val playerUrl = "$mainUrl/player.php?session=$session&play=$id"
         val document = app.get(playerUrl, headers = getHeaders()).document
-
         val modal = document.select(".modal-dialog")
-        var title = ""
+
+        var title = modal.select(".modal-title").text().ifBlank {
+            document.title().replace("ICC FTP SERVER", "").trim()
+        }
         var poster = ""
         var year: Int? = null
         var genre = ""
@@ -211,60 +222,41 @@ class ICCFTPServerProvider : MainAPI() {
                     "Generic Name" -> genre = value
                     "Category" -> category = value
                     "Year" -> year = value.toIntOrNull()
-                    "Discription" -> description = value
+                    "Discription", "Description" -> description = value
                 }
             }
         }
 
-        poster = modal.select("img").attr("src")?.let {
-            if (it.startsWith("http")) it else "$mainUrl/$it"
-        } ?: ""
+        poster = modal.select("img").attr("src")?.let { fixImage(it) } ?: ""
 
-        title = modal.select(".modal-title").text().takeIf { it.isNotBlank() }
-            ?: document.title().replace("ICC FTP SERVER", "").trim()
-
-        // Collect video URLs from modal
         modal.select("a[href]").forEach { link ->
             val href = link.attr("href")
-            if (href.isNotBlank() && (href.contains(".mp4") || href.contains(".mkv"))) {
-                try {
-                    app.post(
-                        "$mainUrl/command.php",
-                        data = mapOf(
-                            "id" to id,
-                            "type" to "download"
-                        ),
-                        headers = getHeaders() + mapOf(
-                            "Content-Type" to "application/x-www-form-urlencoded; charset=UTF-8"
-                        )
-                    )
-                } catch (_: Exception) {
-                }
-                videoUrls.add(href)
+            if (href.contains(".mp4") || href.contains(".mkv") || href.contains(".avi")) {
+                val full = if (href.startsWith("http")) href else "$mainUrl/$href"
+                videoUrls.add(full)
             }
         }
 
-        // Fallback from <video>
         if (videoUrls.isEmpty()) {
-            document.select("video source").forEach { source ->
-                val src = source.attr("src")
-                if (src.isNotBlank()) videoUrls.add(src)
+            document.select("video source, video").forEach { el ->
+                val src = el.attr("src").ifBlank { el.attr("data-src") }
+                if (src.isNotBlank()) {
+                    videoUrls.add(if (src.startsWith("http")) src else "$mainUrl/$src")
+                }
             }
         }
-
-        val isSeries = title.contains("Season", ignoreCase = true) ||
-            title.contains("Episode", ignoreCase = true) ||
-            category.contains("Serials", ignoreCase = true)
 
         val tags = genre.split(",").map { it.trim() }.filter { it.isNotBlank() }
+        val isSeries = title.contains("Season", true) ||
+            title.contains("Episode", true) ||
+            category.contains("Serials", true)
 
         return if (isSeries) {
-            val episodes = getEpisodes(document, id)
             newTvSeriesLoadResponse(
                 name = title,
                 url = url,
                 type = TvType.TvSeries,
-                episodes = episodes
+                episodes = getEpisodes(document, id)
             ) {
                 this.posterUrl = poster
                 this.plot = description
@@ -272,8 +264,12 @@ class ICCFTPServerProvider : MainAPI() {
                 this.tags = tags
             }
         } else {
-            // Pass first video URL (or joined) as data for loadLinks
-            val dataUrl = videoUrls.firstOrNull() ?: url
+            // Store all urls joined so loadLinks can use them
+            val dataUrl = if (videoUrls.isNotEmpty()) {
+                videoUrls.joinToString("||")
+            } else {
+                playerUrl
+            }
             newMovieLoadResponse(
                 name = title,
                 url = url,
@@ -288,37 +284,84 @@ class ICCFTPServerProvider : MainAPI() {
         }
     }
 
+    private suspend fun loadCategory(url: String): LoadResponse {
+        val document = app.get(url, headers = getHeaders()).document
+        val session = getSession()
+        val catName = document.select(".dropdown-toggle").firstOrNull()?.text()?.trim()
+            ?: "Category"
+
+        val episodes = mutableListOf<Episode>()
+        document.select(".post a.image[href*='play='], .post-wrapper > a[href*='play=']")
+            .forEachIndexed { index, a ->
+                val href = a.attr("href")
+                val id = href.substringAfter("play=").substringBefore("&")
+                if (id.isBlank()) return@forEachIndexed
+
+                val post = a.closest(".post")
+                val title = post?.select(".title")?.text()?.ifBlank {
+                    a.select("img").attr("alt")
+                } ?: a.select("img").attr("alt")
+
+                val image = a.select("img").attr("src")
+                if (title.isNotBlank()) {
+                    episodes.add(
+                        newEpisode(createLink(id)) {
+                            this.name = title
+                            this.episode = index + 1
+                            this.posterUrl = fixImage(image)
+                        }
+                    )
+                }
+            }
+
+        return newTvSeriesLoadResponse(
+            name = catName,
+            url = url,
+            type = TvType.TvSeries,
+            episodes = episodes
+        )
+    }
+
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        // data is either a direct video URL, or a player page / id link
         val videoCandidates = mutableListOf<String>()
 
-        if (data.contains(".mp4") || data.contains(".mkv")) {
-            videoCandidates.add(data)
-        } else {
-            // Re-load player page if needed
-            val id = extractId(data)
-            if (id.isNotBlank()) {
-                val session = getSession()
-                val playerUrl = "$mainUrl/player.php?session=$session&play=$id"
-                val document = app.get(playerUrl, headers = getHeaders()).document
+        when {
+            data.contains("||") -> {
+                videoCandidates.addAll(data.split("||").map { it.trim() }.filter { it.isNotBlank() })
+            }
+            data.contains(".mp4") || data.contains(".mkv") || data.contains(".avi") -> {
+                videoCandidates.add(data)
+            }
+            else -> {
+                val id = extractId(data)
+                if (id.isNotBlank()) {
+                    val session = getSession()
+                    val playerUrl = "$mainUrl/player.php?session=$session&play=$id"
+                    val document = app.get(playerUrl, headers = getHeaders()).document
 
-                document.select(".modal-dialog a[href]").forEach { link ->
-                    val href = link.attr("href")
-                    if (href.contains(".mp4") || href.contains(".mkv")) {
-                        videoCandidates.add(href)
+                    document.select(".modal-dialog a[href], a[href*='.mp4'], a[href*='.mkv']")
+                        .forEach { link ->
+                            val href = link.attr("href")
+                            if (href.contains(".mp4") || href.contains(".mkv") || href.contains(".avi")) {
+                                videoCandidates.add(
+                                    if (href.startsWith("http")) href else "$mainUrl/$href"
+                                )
+                            }
+                        }
+                    document.select("video source, video").forEach { el ->
+                        val src = el.attr("src").ifBlank { el.attr("data-src") }
+                        if (src.isNotBlank()) {
+                            videoCandidates.add(
+                                if (src.startsWith("http")) src else "$mainUrl/$src"
+                            )
+                        }
                     }
                 }
-                document.select("video source").forEach { source ->
-                    val src = source.attr("src")
-                    if (src.isNotBlank()) videoCandidates.add(src)
-                }
-            } else {
-                videoCandidates.add(data)
             }
         }
 
@@ -333,8 +376,9 @@ class ICCFTPServerProvider : MainAPI() {
                     type = ExtractorLinkType.VIDEO
                 ) {
                     this.quality = quality
+                    this.referer = mainUrl
                     this.headers = mapOf(
-                        "Referer" to mainUrl,
+                        "Referer" to "$mainUrl/",
                         "User-Agent" to "Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36",
                         "Range" to "bytes=0-"
                     )
@@ -347,93 +391,84 @@ class ICCFTPServerProvider : MainAPI() {
 
     private suspend fun getEpisodes(document: Document, currentId: String): List<Episode> {
         val episodes = mutableListOf<Episode>()
-        val seenIds = mutableSetOf<String>()
+        val seen = mutableSetOf<String>()
 
-        document.select(".post").forEach { post ->
-            val link = post.select("a.image").attr("href")
-            val title = post.select(".title").text()
+        document.select(".post a.image[href*='play='], .post-wrapper > a[href*='play=']")
+            .forEach { a ->
+                val href = a.attr("href")
+                val epId = href.substringAfter("play=").substringBefore("&")
+                if (epId.isBlank() || epId == currentId || !seen.add(epId)) return@forEach
 
-            if (link.isNotBlank() && title.isNotBlank()) {
-                val epId = link.substringAfter("play=").substringBefore("&")
-                if (epId.isNotBlank() && epId != currentId && !seenIds.contains(epId)) {
-                    seenIds.add(epId)
+                val post = a.closest(".post")
+                val title = post?.select(".title")?.text()?.ifBlank {
+                    a.select("img").attr("alt")
+                } ?: a.select("img").attr("alt")
 
-                    val seasonMatch =
-                        Regex("Season\\s*(\\d+)", RegexOption.IGNORE_CASE).find(title)
-                    val episodeMatch =
-                        Regex("Episode\\s*(\\d+)", RegexOption.IGNORE_CASE).find(title)
-                    val sxeMatch =
-                        Regex("S(\\d+)E(\\d+)", RegexOption.IGNORE_CASE).find(title)
-                    val epNumberMatch =
-                        Regex("E(\\d+)", RegexOption.IGNORE_CASE).find(title)
+                val season = Regex("Season\\s*(\\d+)", RegexOption.IGNORE_CASE)
+                    .find(title)?.groupValues?.get(1)?.toIntOrNull()
+                    ?: Regex("S(\\d+)E", RegexOption.IGNORE_CASE)
+                        .find(title)?.groupValues?.get(1)?.toIntOrNull()
+                    ?: 1
+                val episode = Regex("Episode\\s*(\\d+)", RegexOption.IGNORE_CASE)
+                    .find(title)?.groupValues?.get(1)?.toIntOrNull()
+                    ?: Regex("S\\d+E(\\d+)", RegexOption.IGNORE_CASE)
+                        .find(title)?.groupValues?.get(1)?.toIntOrNull()
+                    ?: Regex("E(\\d+)", RegexOption.IGNORE_CASE)
+                        .find(title)?.groupValues?.get(1)?.toIntOrNull()
+                    ?: episodes.size + 1
 
-                    val season = seasonMatch?.groupValues?.get(1)?.toIntOrNull()
-                        ?: sxeMatch?.groupValues?.get(1)?.toIntOrNull()
-                        ?: 1
-                    val episode = episodeMatch?.groupValues?.get(1)?.toIntOrNull()
-                        ?: sxeMatch?.groupValues?.get(2)?.toIntOrNull()
-                        ?: epNumberMatch?.groupValues?.get(1)?.toIntOrNull()
-                        ?: episodes.size + 1
-
-                    episodes.add(
-                        newEpisode(createLink(epId)) {
-                            this.name = title
-                            this.season = season
-                            this.episode = episode
-                        }
-                    )
-                }
+                episodes.add(
+                    newEpisode(createLink(epId)) {
+                        this.name = title
+                        this.season = season
+                        this.episode = episode
+                        this.posterUrl = fixImage(a.select("img").attr("src"))
+                    }
+                )
             }
-        }
 
         return episodes.sortedWith(compareBy({ it.season }, { it.episode }))
     }
 
     private suspend fun getSession(): String {
-        currentSession?.let { return it }
+        currentSession?.let { if (it.isNotBlank()) return it }
 
-        val response = app.get(mainUrl)
-        currentSession = response.cookies["PHPSESSID"]
-
-        if (currentSession == null) {
-            val html = response.text
-            val sessionMatch = Regex("session=([a-f0-9]+)").find(html)
-            currentSession = sessionMatch?.groupValues?.get(1)
-        }
+        val response = app.get(
+            mainUrl,
+            headers = mapOf(
+                "User-Agent" to "Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36",
+                "Referer" to "http://10.16.100.202/"
+            )
+        )
+        val html = response.text
+        currentSession = Regex("session=([a-f0-9]{20,})")
+            .find(html)?.groupValues?.get(1)
+            ?: response.cookies["PHPSESSID"]
+            ?: ""
 
         return currentSession ?: ""
     }
 
     private suspend fun getToken(session: String): String {
-        currentToken?.let { return it }
+        currentToken?.let { if (it.isNotBlank()) return it }
 
-        val url = if (session.isNotEmpty()) {
-            "$mainUrl/dashboard.php?session=$session&category=0"
-        } else {
-            "$mainUrl/dashboard.php?category=0"
-        }
-
+        val url = "$mainUrl/dashboard.php?session=$session&category=0"
         val html = app.get(url, headers = getHeaders()).text
-        val tokenMatch = Regex("name=\"token\" value=\"([^\"]+)\"").find(html)
-        currentToken = tokenMatch?.groupValues?.get(1)
+        currentToken = Regex("name=\"token\"\\s+value=\"([^\"]+)\"")
+            .find(html)?.groupValues?.get(1)
+            ?: ""
 
         return currentToken ?: ""
     }
 
     private fun getHeaders(): Map<String, String> {
-        val headers = mutableMapOf(
-            "User-Agent" to "Mozilla/5.0 (Linux; Android 12; SM-M025F Build/SP1A.210812.016) AppleWebKit/537.36",
+        return mapOf(
+            "User-Agent" to "Mozilla/5.0 (Linux; Android 12; SM-M025F Build/SP1A.210812.016) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
             "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language" to "en-GB,en-US;q=0.9,en;q=0.8",
-            "X-Requested-With" to "com.mycompany.app.soulbrowser",
-            "Accept-Encoding" to "gzip, deflate"
+            "Referer" to "$mainUrl/",
+            "X-Requested-With" to "com.mycompany.app.soulbrowser"
         )
-
-        currentSession?.let {
-            headers["Cookie"] = "PHPSESSID=$it"
-        }
-
-        return headers
     }
 
     private fun createLink(id: String): String {
@@ -449,11 +484,16 @@ class ICCFTPServerProvider : MainAPI() {
         return url.substringAfter("play=").substringBefore("&")
     }
 
+    private fun fixImage(path: String?): String? {
+        if (path.isNullOrBlank()) return null
+        return if (path.startsWith("http")) path else "$mainUrl/$path"
+    }
+
     private fun extractQuality(text: String?): Int? {
         if (text.isNullOrEmpty()) return null
-        val lowerText = text.lowercase()
+        val lower = text.lowercase()
         for ((pattern, quality) in QUALITY_PATTERNS) {
-            if (lowerText.contains(pattern)) return quality
+            if (lower.contains(pattern)) return quality
         }
         return null
     }
