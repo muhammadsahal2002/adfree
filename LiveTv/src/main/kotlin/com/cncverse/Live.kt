@@ -1,4 +1,4 @@
-package com.cncverse   // ← change this if your package is different
+package com.cncverse
 
 import android.util.Log
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -104,6 +104,7 @@ open class Live : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         return try {
+            // FIXED HERE
             val document = app.get("\( mainUrl/ \){request.data}?page_id=$page", timeout = 15_000).document
             val home = document.select("div.video-thumb").mapNotNull { it.toSearchResult() }
 
@@ -128,6 +129,7 @@ open class Live : MainAPI() {
 
         domains.amap { domain ->
             try {
+                // FIXED HERE
                 val document = app.get(
                     "\( domain/search?keyword= \){query.encodeURLParameter()}&page_id=$page",
                     timeout = 15_000
@@ -172,7 +174,6 @@ open class Live : MainAPI() {
             list.filter { seen.add(it.url) }
         }
 
-        // Fixed: added type <Links>
         val links: Links? = runCatching {
             if (videoId != null)
                 app.get("$mainUrl/ajax/resolution_switcher.php?video_id=$videoId").parsedSafe<Links>()
@@ -212,7 +213,6 @@ open class Live : MainAPI() {
             .mapNotNull { it.toSearchResult() }
 
         if (tvType == TvType.TvSeries) {
-            // Fixed: added type <EpisodesResponse>
             val data: EpisodesResponse? = runCatching {
                 if (videoId != null)
                     app.get("$mainUrl/ajax/episodes.php?video_id=$videoId").parsedSafe<EpisodesResponse>()
@@ -265,7 +265,6 @@ open class Live : MainAPI() {
                                 val innerVideoId = allqualities.selectFirst("input#video-id")
                                     ?.attr("value")?.takeIf { it.isNotBlank() }
 
-                                // Fixed: added type <Links>
                                 val epLinks: Links? = runCatching {
                                     if (shouldRequestResSwitcher && innerVideoId != null) {
                                         app.get("$mainUrl/ajax/resolution_switcher.php?video_id=$innerVideoId")
