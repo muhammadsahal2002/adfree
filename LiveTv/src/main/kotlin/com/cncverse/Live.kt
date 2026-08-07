@@ -15,6 +15,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import org.jsoup.nodes.Element
+import java.net.URLEncoder
 
 @CloudstreamPlugin
 class LivePlugin : BasePlugin() {
@@ -104,8 +105,10 @@ open class Live : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         return try {
-            // FIXED HERE
-            val document = app.get("\( mainUrl/ \){request.data}?page_id=$page", timeout = 15_000).document
+            val document = app.get(
+                "\( mainUrl/ \){request.data}?page_id=$page",
+                timeout = 15_000
+            ).document
             val home = document.select("div.video-thumb").mapNotNull { it.toSearchResult() }
 
             newHomePageResponse(
@@ -122,16 +125,15 @@ open class Live : MainAPI() {
         }
     }
 
-    // Search all 3 domains
-    override suspend fun search(query: String, page: Int): SearchResponseList {
+    override suspend fun search(query: String): List<SearchResponse> {
         val domains = allDomains()
         val results = mutableListOf<SearchResponse>()
+        val encoded = URLEncoder.encode(query, "UTF-8")
 
         domains.amap { domain ->
             try {
-                // FIXED HERE
                 val document = app.get(
-                    "\( domain/search?keyword= \){query.encodeURLParameter()}&page_id=$page",
+                    "$domain/search?keyword=$encoded&page_id=1",
                     timeout = 15_000
                 ).document
 
@@ -144,7 +146,7 @@ open class Live : MainAPI() {
             }
         }
 
-        return results.distinctBy { it.url }.toNewSearchResponseList()
+        return results.distinctBy { it.url }
     }
 
     override suspend fun load(url: String): LoadResponse = withContext(Dispatchers.IO) {
@@ -205,7 +207,8 @@ open class Live : MainAPI() {
                     val dlItem = toLoadItem(null, dlUrl.trim(), false)
                     out = LoadlinksOut(status = out.status, current = listOf(dlItem), popup = emptyList())
                 }
-            } catch (_: Throwable) {}
+            } catch (_: Throwable) {
+            }
         }
 
         val recommendations = document
@@ -261,7 +264,8 @@ open class Live : MainAPI() {
                                 }.getOrNull() ?: return@withPermit null
 
                                 val shouldRequestResSwitcher =
-                                    allqualities.select("div.available-res:contains(Available in Other Parts:)").isNotEmpty()
+                                    allqualities.select("div.available-res:contains(Available in Other Parts:)")
+                                        .isNotEmpty()
                                 val innerVideoId = allqualities.selectFirst("input#video-id")
                                     ?.attr("value")?.takeIf { it.isNotBlank() }
 
@@ -297,7 +301,8 @@ open class Live : MainAPI() {
 
                                 if (epOut.current.isEmpty() && epOut.popup.isEmpty()) {
                                     try {
-                                        val downloadEl = allqualities.selectFirst("a.hidden-button.buttonDownloadnew")
+                                        val downloadEl =
+                                            allqualities.selectFirst("a.hidden-button.buttonDownloadnew")
                                         val dlUrl = downloadEl?.attr("href")?.substringAfter("url=")
                                         if (!dlUrl.isNullOrBlank()) {
                                             val dlItem = toLoadItem(null, dlUrl.trim(), false)
@@ -307,7 +312,8 @@ open class Live : MainAPI() {
                                                 popup = emptyList()
                                             )
                                         }
-                                    } catch (_: Throwable) {}
+                                    } catch (_: Throwable) {
+                                    }
                                 }
 
                                 newEpisode(epOut.toJson()) {
@@ -360,8 +366,8 @@ open class Live : MainAPI() {
             if (url.isEmpty()) return@amap
 
             val isDirectMedia = url.contains(".mkv", true) ||
-                    url.contains(".mp4", true) ||
-                    url.contains(".m3u8", true)
+                url.contains(".mp4", true) ||
+                url.contains(".m3u8", true)
 
             val finalUrl = if (isDirectMedia) {
                 url
@@ -380,9 +386,14 @@ open class Live : MainAPI() {
             }
 
             callback.invoke(
-                newExtractorLink(mainUrl, name, finalUrl) {
+                newExtractorLink(
+                    source = name,
+                    name = name,
+                    url = finalUrl
+                ) {
                     this.quality = getQualityFromName(item.quality)
                     this.headers = mapOf("Referer" to mainUrl)
+                    this.referer = mainUrl
                 }
             )
         }
@@ -404,8 +415,6 @@ open class Live : MainAPI() {
         }
     }
 }
-
-// ───────────────────────────── Helpers & Models ─────────────────────────────
 
 fun cleanTitle(raw: String?): String {
     if (raw.isNullOrBlank()) return "Unknown"
