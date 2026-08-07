@@ -1,4 +1,4 @@
-package com.Fibwatch
+package com.cncverse   // ← change this if your package is different
 
 import android.util.Log
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -16,15 +16,10 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import org.jsoup.nodes.Element
 
-// ───────────────────────────── Plugin ─────────────────────────────
-
 @CloudstreamPlugin
-class FibwatchPlugin : BasePlugin() {
+class LivePlugin : BasePlugin() {
     override fun load() {
-        registerMainAPI(Fibwatch())
-        // Optional: keep separate providers if you still want them
-        // registerMainAPI(Fibtoon())
-        // registerMainAPI(Fibwatchdrama())
+        registerMainAPI(Live())
     }
 
     companion object {
@@ -35,20 +30,16 @@ class FibwatchPlugin : BasePlugin() {
         private var cachedDomains: Domains? = null
 
         suspend fun getDomains(forceRefresh: Boolean = false): Domains {
-            if (cachedDomains != null && !forceRefresh) {
-                return cachedDomains!!
-            }
+            if (cachedDomains != null && !forceRefresh) return cachedDomains!!
 
             return try {
                 val domains = app.get(DOMAINS_URL, timeout = 12_000).parsedSafe<Domains>()
                 if (domains != null) {
                     cachedDomains = domains
                     domains
-                } else {
-                    fallbackDomains()
-                }
+                } else fallbackDomains()
             } catch (e: Exception) {
-                Log.e("Fibwatch", "Failed to fetch domains", e)
+                Log.e("Live", "Failed to fetch domains", e)
                 fallbackDomains()
             }
         }
@@ -67,12 +58,10 @@ class FibwatchPlugin : BasePlugin() {
     }
 }
 
-// ───────────────────────────── Main Provider ─────────────────────────────
-
-open class Fibwatch : MainAPI() {
+open class Live : MainAPI() {
 
     override var mainUrl = "https://fibwatch.art"
-    override var name = "FibWatch"
+    override var name = "Live"
     override val hasMainPage = true
     override var lang = "hi"
     override val hasDownloadSupport = true
@@ -85,9 +74,8 @@ open class Fibwatch : MainAPI() {
         TvType.AsianDrama
     )
 
-    // All three domains for multi-search
     private suspend fun allDomains(): List<String> {
-        val d = FibwatchPlugin.getDomains()
+        val d = LivePlugin.getDomains()
         return listOf(d.fibwatch, d.fibtoon, d.fibdrama).distinct()
     }
 
@@ -114,7 +102,6 @@ open class Fibwatch : MainAPI() {
         "videos/category/other" to "Other"
     )
 
-    // ───────────── Main Page ─────────────
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         return try {
             val document = app.get("\( mainUrl/ \){request.data}?page_id=$page", timeout = 15_000).document
@@ -134,7 +121,7 @@ open class Fibwatch : MainAPI() {
         }
     }
 
-    // ───────────── Search (ALL 3 domains) ─────────────
+    // Search all 3 domains
     override suspend fun search(query: String, page: Int): SearchResponseList {
         val domains = allDomains()
         val results = mutableListOf<SearchResponse>()
@@ -149,9 +136,7 @@ open class Fibwatch : MainAPI() {
                 val items = document.select("div.video-thumb").mapNotNull { el ->
                     el.toSearchResult(domain)
                 }
-                synchronized(results) {
-                    results.addAll(items)
-                }
+                synchronized(results) { results.addAll(items) }
             } catch (e: Exception) {
                 Log.w(name, "Search failed on $domain → ${e.message}")
             }
@@ -160,7 +145,6 @@ open class Fibwatch : MainAPI() {
         return results.distinctBy { it.url }.toNewSearchResponseList()
     }
 
-    // ───────────── Load ─────────────
     override suspend fun load(url: String): LoadResponse = withContext(Dispatchers.IO) {
         val document = app.get(url, timeout = 20_000).document
 
@@ -188,9 +172,10 @@ open class Fibwatch : MainAPI() {
             list.filter { seen.add(it.url) }
         }
 
+        // Fixed: added type <Links>
         val links: Links? = runCatching {
             if (videoId != null)
-                app.get("$mainUrl/ajax/resolution_switcher.php?video_id=$videoId").parsedSafe()
+                app.get("$mainUrl/ajax/resolution_switcher.php?video_id=$videoId").parsedSafe<Links>()
             else null
         }.getOrNull()
 
@@ -227,9 +212,10 @@ open class Fibwatch : MainAPI() {
             .mapNotNull { it.toSearchResult() }
 
         if (tvType == TvType.TvSeries) {
+            // Fixed: added type <EpisodesResponse>
             val data: EpisodesResponse? = runCatching {
                 if (videoId != null)
-                    app.get("$mainUrl/ajax/episodes.php?video_id=$videoId").parsedSafe()
+                    app.get("$mainUrl/ajax/episodes.php?video_id=$videoId").parsedSafe<EpisodesResponse>()
                 else null
             }.getOrNull()
 
@@ -279,10 +265,11 @@ open class Fibwatch : MainAPI() {
                                 val innerVideoId = allqualities.selectFirst("input#video-id")
                                     ?.attr("value")?.takeIf { it.isNotBlank() }
 
+                                // Fixed: added type <Links>
                                 val epLinks: Links? = runCatching {
                                     if (shouldRequestResSwitcher && innerVideoId != null) {
                                         app.get("$mainUrl/ajax/resolution_switcher.php?video_id=$innerVideoId")
-                                            .parsedSafe()
+                                            .parsedSafe<Links>()
                                     } else null
                                 }.getOrNull()
 
@@ -356,7 +343,6 @@ open class Fibwatch : MainAPI() {
         }
     }
 
-    // ───────────── Load Links ─────────────
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
@@ -404,7 +390,6 @@ open class Fibwatch : MainAPI() {
         return true
     }
 
-    // ───────────── Helpers ─────────────
     private fun Element.toSearchResult(domain: String = mainUrl): SearchResponse? {
         val rawTitle = this.selectFirst("p.hptag")?.text()
             ?: this.selectFirst("img")?.attr("alt")
