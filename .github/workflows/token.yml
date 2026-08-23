@@ -1,33 +1,44 @@
-name: Refresh Session Token
+name: Update Token Every 6 Hours
 
 on:
   schedule:
-    - cron: '0 */6 * * *'   # every 6 hours (tokens last ~12h)
+    - cron: '0 */6 * * *'
   workflow_dispatch:
-
-permissions:
-  contents: write
 
 jobs:
   update-token:
     runs-on: ubuntu-latest
+    
     steps:
-      - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-      - run: pip install requests
-      - name: Generate session token
-        run: python generate_token.py > token.json
-      - name: Commit and push
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add token.json
-          if ! git diff --quiet --staged; then
-            git commit -m "Update session token [skip ci]"
-            git push
-          fi
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        
+    - name: Install dependencies
+      run: |
+        pip install requests
+        
+    - name: Generate token
+      run: |
+        python generate_token.py
+        
+    - name: Upload token as artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: token
+        path: token.json
+        retention-days: 1  # Keep for 1 day only
+        
+    - name: Commit and push if token changed
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add token.json token_update.log
+        git diff --staged --quiet || git commit -m "Update token.json [skip ci]"
+        git push
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
