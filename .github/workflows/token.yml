@@ -9,6 +9,9 @@ jobs:
   update-token:
     runs-on: ubuntu-latest
     
+    permissions:
+      contents: write
+    
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
@@ -26,19 +29,14 @@ jobs:
       run: |
         python generate_token.py
         
-    - name: Upload token as artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: token
-        path: token.json
-        retention-days: 1  # Keep for 1 day only
-        
-    - name: Commit and push if token changed
+    - name: Commit and push
       run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        git add token.json token_update.log
-        git diff --staged --quiet || git commit -m "Update token.json [skip ci]"
-        git push
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git add token.json token_update.log || true
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "🤖 Auto-update token [skip ci]"
+          git push
+        fi
