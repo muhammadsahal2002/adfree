@@ -15,7 +15,7 @@ from datetime import datetime
 
 # ---------- Headers (matching your captured requests) ----------
 HEADERS_HOME = {
-    "User-Agent": "Mozilla/5.0 (Linux; Android 17; SM-S928B Build/UP1A.231005.007) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.7922.139 Mobile Safari/537.36",
+    "User-Agent": "Mozilla/5.0 (Linux; Android 12; SM-M025F Build/SP1A.210812.016; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/151.0.7922.85 Mobile Safari/537.36 /OS.Gatu v3.1",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
     "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
     "Accept-Encoding": "gzip, deflate, br",
@@ -31,7 +31,7 @@ HEADERS_HOME = {
 }
 
 HEADERS_AJAX = {
-    "User-Agent": "Mozilla/5.0 (Linux; Android 17; SM-S928B Build/UP1A.231005.007) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.7922.139 Mobile Safari/537.36",
+    "User-Agent": "Mozilla/5.0 (Linux; Android 12; SM-M025F Build/SP1A.210812.016; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/151.0.7922.85 Mobile Safari/537.36 /OS.Gatu v3.1",
     "Accept": "*/*",
     "Accept-Language": "en-GB,en-US;q=0.9,en;q=0.8",
     "Accept-Encoding": "gzip, deflate, br",
