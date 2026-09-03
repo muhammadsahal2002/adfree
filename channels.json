@@ -1,0 +1,214 @@
+{
+  "categories": [
+    {
+      "name": "Indian Channels",
+      "channels": [
+        {
+          "name": "9X Jalwa",
+          "logo": "https://otapp.store/uploads/tv_image/sm/9x-jalwa.png",
+          "url": "https://wiselp.wiseplayout.com/9X_Jalwa/master.m3u8"
+        },
+        {
+          "name": "Aaj Tak",
+          "logo": "https://feeds.intoday.in/aajtak/images/logo.png",
+          "url": "https://feeds.intoday.in/aajtak/api/master.m3u8"
+        },
+        {
+          "name": "ABP News",
+          "logo": "https://d2l4ar6y3mrs4k.cloudfront.net/images/abpnews.png",
+          "url": "https://d2l4ar6y3mrs4k.cloudfront.net/live-streaming/abpnews-livetv/master.m3u8"
+        },
+        {
+          "name": "DD National",
+          "logo": "https://cdn-2.pishow.tv/images/dd-national.png",
+          "url": "https://mumt01.tangotv.in/O5aw8Zn3DDNATIONALHD/index.m3u8"
+        },
+        {
+          "name": "NDTV 24x7",
+          "logo": "https://ndtv.com/images/logo.png",
+          "url": "https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/NDTV24x7.m3u8"
+        },
+        {
+          "name": "Times Now",
+          "logo": "https://timesnownews.com/images/logo.png",
+          "url": "https://dztlhgid9me95.cloudfront.net/live-tv/Vidgyor/timesnow/timesnow_master.m3u8"
+        },
+        {
+          "name": "WION",
+          "logo": "https://wionews.com/images/logo.png",
+          "url": "https://d7x8z4yuq42qn.cloudfront.net/index_7.m3u8"
+        },
+        {
+          "name": "Zee News",
+          "logo": "https://zeenews.com/images/logo.png",
+          "url": "https://dknttpxmr0dwf.cloudfront.net/index_57.m3u8"
+        },
+        {
+          "name": "Zee Business",
+          "logo": "https://zeebiz.com/images/logo.png",
+          "url": "https://dwby15d04agvq.cloudfront.net/index_5.m3u8"
+        },
+        {
+          "name": "Republic TV",
+          "logo": "https://republicworld.com/images/logo.png",
+          "url": "https://samsung-republictv.amagi.tv/ts-ap-s1-n1/playlist/samsungin-republictv-samsungindia/playlist.m3u8"
+        },
+        {
+          "name": "News Nation",
+          "logo": "https://newsnationtv.com/images/logo.png",
+          "url": "https://d3qs3d2rkhfqrt.cloudfront.net/out/v1/6cd2f649739a45ca9de1daf81cc7d0f2/index.m3u8"
+        },
+        {
+          "name": "India TV",
+          "logo": "https://indiatvnews.com/images/logo.png",
+          "url": "https://pl-indiatvnews.akamaized.net/out/v1/db79179b608641ceaa5a4d0dd0dca8da/index.m3u8"
+        },
+        {
+          "name": "Sansad TV 1",
+          "logo": "https://sansadtv.nic.in/images/logo.png",
+          "url": "https://d2lk5u59tns74c.cloudfront.net/out/v1/fff8f20221d5456e8922e689d71dedc3/index.m3u8"
+        },
+        {
+          "name": "Sansad TV 2",
+          "logo": "https://sansadtv.nic.in/images/logo2.png",
+          "url": "https://d2lk5u59tns74c.cloudfront.net/out/v1/e4182054dce340da9e0ff38b6b3658a4/index.m3u8"
+        },
+        {
+          "name": "Raj TV",
+          "logo": "https://rajtv.in/images/logo.png",
+          "url": "https://livestream.rajtv.tv/hlslive/Admin/px08241087/live/RAJTV/master_1.m3u8"
+        },
+        {
+          "name": "Polimer News",
+          "logo": "https://polimernews.com/images/logo.png",
+          "url": "https://segment.yuppcdn.net/110322/polimernews/playlist.m3u8"
+        },
+        {
+          "name": "Amrita TV",
+          "logo": "https://amritatv.com/images/logo.png",
+          "url": "https://ddash74r36xqp.cloudfront.net/master.m3u8"
+        },
+        {
+          "name": "Mazhavil Manorama",
+          "logo": "https://mazhavilmanorama.com/images/logo.png",
+          "url": "https://yuppmedtaorire.akamaized.net/v1/master/a0d007312bfd99c47f76b77ae26b1ccdaae76cb1/mazhavilmanorama_nim_https/050522/mazhavilmanorama/playlist.m3u8"
+        },
+        {
+          "name": "Manorama News",
+          "logo": "https://manoramanews.com/images/logo.png",
+          "url": "https://mmtvnews1.akamaized.net/v1/master/673630b269b766886555eebfddd4f27f3de3ab50/mmtvNewsCampaign1/index.m3u8"
+        },
+        {
+          "name": "Mathrubhumi News",
+          "logo": "https://mathrubhumi.com/images/logo.png",
+          "url": "https://mathrubhumicdn.vidgyor.com/mathrubhumi-origin/liveabr/playlist.m3u8"
+        },
+        {
+          "name": "Kairali TV",
+          "logo": "https://kairalitv.com/images/logo.png",
+          "url": "https://mumt01.tangotv.in/O5aw8Zn3KAIRALI/index.m3u8"
+        },
+        {
+          "name": "Jaihind TV",
+          "logo": "https://jaihindtv.com/images/logo.png",
+          "url": "https://yuppnimrestreammum.akamaized.net/260723/smil:jaihind1.smil/playlist.m3u8?hdnts=st=1735898689~exp=1835898688~acl=*~hmac=f5fe24724fe05481e3841f9eb5ab8efdee0a3dd83645ae9dcf45703f525bab7b"
+        },
+        {
+          "name": "PTC Punjabi",
+          "logo": "https://ptcpunjabi.com/images/logo.png",
+          "url": "https://d3qs3d2rkhfqrt.cloudfront.net/out/v1/3e22a9c278db4e3eb779afd42e41b0a6/index.m3u8"
+        },
+        {
+          "name": "PTC Music",
+          "logo": "https://ptcmusic.com/images/logo.png",
+          "url": "https://d2lk5u59tns74c.cloudfront.net/out/v1/f913cf893c594f73b114216e74a2efbc/index.m3u8"
+        },
+        {
+          "name": "Shemaroo TV",
+          "logo": "https://shemaroo.com/images/logo.png",
+          "url": "https://airtelapp.shemaroo.com/shemarootv/smil:shemarootvadp.smil/playlist.m3u8"
+        },
+        {
+          "name": "Dangal TV",
+          "logo": "https://dangalplay.com/images/logo.png",
+          "url": "https://live-dangal.akamaized.net/liveabr/playlist.m3u8"
+        },
+        {
+          "name": "Dangal 2",
+          "logo": "https://dangalplay.com/images/logo2.png",
+          "url": "https://live-dangal2.akamaized.net/liveabr/playlist.m3u8"
+        },
+        {
+          "name": "B4U Music",
+          "logo": "https://b4umusic.com/images/logo.png",
+          "url": "https://mumt04.tangotv.in/m18aqlK4B4UMUSIC/index.m3u8"
+        },
+        {
+          "name": "B4U Movies",
+          "logo": "https://b4umovies.com/images/logo.png",
+          "url": "https://mumt04.tangotv.in/m18aqlK4B4UMOVIES/index.m3u8"
+        },
+        {
+          "name": "Travelxp HD",
+          "logo": "https://travelxp.com/images/logo.png",
+          "url": "https://amg00416-amg00416c9-samsung-in-4882.playouts.now.amagi.tv/playlist/amg00416-travelxp-travelxphd-samsungin/playlist.m3u8"
+        },
+        {
+          "name": "History TV18",
+          "logo": "https://historytv18.com/images/logo.png",
+          "url": "https://amg01448-amg01448c16-samsung-in-3495.playouts.now.amagi.tv/playlist/amg01448-samsungindia-historychannelenglish-samsungin/playlist.m3u8"
+        },
+        {
+          "name": "CNBC TV18",
+          "logo": "https://cnbctv18.com/images/logo.png",
+          "url": "https://n18syndication.akamaized.net/bpk-tv/CNBC_TV18_NW18_MOB/output01/index.m3u8"
+        },
+        {
+          "name": "ETV Telugu",
+          "logo": "https://etv.co.in/images/logo.png",
+          "url": "https://d27zlkxhgwrfgo.cloudfront.net/v1/master/9d43eacaed199f8d5883927e7aef514a8a08e108/ETV_HD_H264_cloud_in/index.m3u8"
+        },
+        {
+          "name": "ETV Cinema",
+          "logo": "https://etvcinema.com/images/logo.png",
+          "url": "https://d27zlkxhgwrfgo.cloudfront.net/v1/master/9d43eacaed199f8d5883927e7aef514a8a08e108/ETV_CINEMA_H264_cloud_in/index.m3u8"
+        },
+        {
+          "name": "Sakshi TV",
+          "logo": "https://sakshi.com/images/logo.png",
+          "url": "https://yuppmedtaorire.akamaized.net/v1/master/a0d007312bfd99c47f76b77ae26b1ccdaae76cb1/sakshi_nim_https/240122/sakshi/playlist.m3u8"
+        },
+        {
+          "name": "TV9 Telugu",
+          "logo": "https://tv9telugu.com/images/logo.png",
+          "url": "https://dyjmyiv3bp2ez.cloudfront.net/pub-iotv9telcmjhcs/liveabr/playlist.m3u8"
+        },
+        {
+          "name": "TV9 Kannada",
+          "logo": "https://tv9kannada.com/images/logo.png",
+          "url": "https://dyjmyiv3bp2ez.cloudfront.net/pub-iotv9kanmo6oiq/liveabr/playlist.m3u8"
+        },
+        {
+          "name": "TV9 Marathi",
+          "logo": "https://tv9marathi.com/images/logo.png",
+          "url": "https://dyjmyiv3bp2ez.cloudfront.net/pub-iotv9marlygv8h/liveabr/playlist.m3u8"
+        },
+        {
+          "name": "TV9 Gujarati",
+          "logo": "https://tv9gujarati.com/images/logo.png",
+          "url": "https://dyjmyiv3bp2ez.cloudfront.net/pub-iotv9guj3ki8lu/liveabr/playlist.m3u8"
+        },
+        {
+          "name": "TV9 Bangla",
+          "logo": "https://tv9bangla.com/images/logo.png",
+          "url": "https://dyjmyiv3bp2ez.cloudfront.net/pub-iotv9banaen8yq/liveabr/playlist.m3u8"
+        },
+        {
+          "name": "Swaraj Express",
+          "logo": "https://swarajexpress.com/images/logo.png",
+          "url": "https://d1msejlow1t3l4.cloudfront.net/fta/swarajexpresssmbc/playlist.m3u8"
+        }
+      ]
+    }
+  ]
+}
