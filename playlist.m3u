@@ -1,5 +1,5 @@
 #EXTM3U
-#EXTINF:-1 tvg-id="StarJalsha.in@HD" tvg-logo="https://i.imgur.com/IlufzR5.png" ,Star Jalsha HD
+#EXTINF:-1 tvg-id="StarJalsha.in@HD" tvg-logo="https://en.wikipedia.org/wiki/Star_Jalsha#/media/File:Star_Jalsha_logo_2023.png" ,Star Jalsha HD
 https://da86m1sqpm3o0.cloudfront.net/28072023/smil:starjalsha.smil/chunklist_b1928000.m3u8
 #EXTINF:-1 tvg-logo="https://xstreamcp-assets-msp.streamready.in/assets/LIVETV/LIVECHANNEL/LIVETV_LIVETVCHANNEL_ZEE_BANGLA/images/LOGO_HD/LOGO_HD_image.png" ,Zee Bangla
 https://stream.ottplus.bd/live/zee_bangla_abr/index.m3u8
