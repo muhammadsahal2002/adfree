@@ -27,10 +27,10 @@ http://202.70.146.135:8000/play/a02t/index.m3u8
 http://live.balajibroadband.com:3500/live/1345.m3u8
 #EXTINF:-1 tvg-logo="https://sonypicturesnetworks.com/images/logos/SONY%20YAY.png"  group-title="Kids",Sony Yay
 http://live.balajibroadband.com:3500/live/872.m3u8
-#EXTINF:-1 tvg-id="StarJalsha.in@HD" tvg-logo="https://en.wikipedia.org/wiki/Star_Jalsha#/media/File:Star_Jalsha_logo_2023.png"  group-title="Entertainment",Star Jalsha HD
+#EXTINF:-1 tvg-id="StarJalsha.in@HD" tvg-logo="https://i.imgur.com/IlufzR5.png"  group-title="Entertainment",Star Jalsha HD
 https://da86m1sqpm3o0.cloudfront.net/28072023/smil:starjalsha.smil/chunklist_b1928000.m3u8
 #EXTINF:-1 tvg-logo="https://xstreamcp-assets-msp.streamready.in/assets/LIVETV/LIVECHANNEL/LIVETV_LIVETVCHANNEL_ZEE_BANGLA/images/LOGO_HD/LOGO_HD_image.png"  group-title="Entertainment",Zee Bangla
-https://stream.ottplus.bd/live/zee_bangla_abr/index.m3u8
+https://raw.githubusercontent.com/amazeyourself/adaptive-streams/refs/heads/main/streams/in/YuppTV/ZeeBanglaHD.m3u8
 #EXTINF:-1 tvg-logo="https://upload.wikimedia.org/wikipedia/commons/7/7b/Colors_Bangla.png"  group-title="Entertainment",Colors Bangla
 http://tv.indigotv.me:80/live.ts?channelId=92&uid=7245&deviceMac=00:1A:79:4A:02:91
 #EXTINF:-1 tvg-logo="https://tstatic.akash-go.com/cms-ui/images/custom-content/1742713000749.png"  group-title="Entertainment",Deepto TV
@@ -43,7 +43,7 @@ http://202.70.146.135:8000/play/a06c/index.m3u8
 http://202.70.146.135:8000/play/a00b/index.m3u8
 #EXTINF:-1 tvg-logo="https://jiotv.catchup.cdn.jio.com/dare_images/images/ColorsHD.png"  group-title="Entertainment",Colors HD
 http://live.balajibroadband.com:3500/live/144.m3u8
-#EXTINF:-1 tvg-logo="https://assets.dishhomego.com.np/f_webp group-title="Entertainment",q_85,w_250/dhome/posters/ea93cb6a-cb48-4841-99d2-8d2cfd835b63.jpg" ,SAB HD
+#EXTINF:-1 tvg-logo="https://en.wikipedia.org/wiki/Sony_SAB#/media/File:SONY_SAB_SD_Logo_2022.png" ,SAB HD
 http://live.balajibroadband.com:3500/live/471.m3u8
 #EXTINF:-1 tvg-logo="https://sonypicturesnetworks.com/images/logos/SONY%20AATH.png"  group-title="Entertainment",Sony Aath
 http://live.balajibroadband.com:3500/live/697.m3u8
@@ -53,7 +53,7 @@ http://202.70.146.135:8000/play/a005/index.m3u8
 http://live.balajibroadband.com:3500/live/474.m3u8
 #EXTINF:-1 tvg-logo="https://i.postimg.cc/Gpz6FLrP/20240823_023114.png"  group-title="Entertainment",Sony SAB HD
 http://202.70.146.135:8000/play/a025/index.m3u8
-#EXTINF:-1 tvg-logo="https://i.imgur.com/xWxNy3L.pn"  group-title="Entertainment",StarPlus HD
+#EXTINF:-1 tvg-logo="https://i.imgur.com/xWxNy3L.png"  group-title="Entertainment",StarPlus HD
 http://202.70.146.135:8000/play/a009/index.m3u8
 #EXTINF:-1 tvg-logo="https://xstreamcp-assets-msp.streamready.in/assets/LIVETV/LIVECHANNEL/LIVETV_LIVETVCHANNEL_ZEE_TV/images/LOGO_HD/LOGO_HD_image.png"  group-title="Entertainment",ZEE TV HD
 http://202.70.146.135:8000/play/a04g/index.m3u8
@@ -109,7 +109,7 @@ http://202.70.146.135:8000/play/a068/index.m3u8
 http://202.70.146.135:8000/play/a03f/index.m3u8
 #EXTINF:-1 tvg-logo=""  group-title="Sports",EURO SPORT HD
 http://202.70.146.135:8000/play/a05s/index.m3u8
-#EXTINF:-1 tvg-logo="https://www.sonypicturesnetworks.com/images/logos/SONY_SportsTen5_HD_Logo_CLR.png"  group-title="Sports",SONY SPORTS 5
+#EXTINF:-1 tvg-logo="https://xstreamcp-assets-msp.streamready.in/assets/LIVETV/LIVECHANNEL/LIVETV_LIVETVCHANNEL_SONY_SPORTS_TEN_5/images/LOGO_HD/image.png"  group-title="Sports",SONY SPORTS 5
 http://202.70.146.135:8000/play/a09r/index.m3u8
 #EXTINF:-1 tvg-logo="https://i.imgur.com/Mh9tKPx.png"  group-title="Sports",STAR SPORT SELECT 1
 http://202.70.146.135:8000/play/a03c/index.m3u8
@@ -141,7 +141,7 @@ https://wiselp.wiseplayout.com/9XM/master.m3u8
 http://103.175.73.12:8080/live/157/157_0.m3u8
 #EXTINF:-1 tvg-logo="https://otapp.store/uploads/tv_image/sm/zing.jpg"  group-title="Music",Zing
 http://146.59.253.52:8080/hindihitshd/index.m3u8
-#EXTINF:-1 tvg-logo="https://www.sonypicturesnetworks.com/images/logos/SBBCE_LOGO_NEW_PNG.png"  group-title="Documentary",BBC EARTH
+#EXTINF:-1 tvg-logo="https://www.sonypicturesnetworks.com/images/logos/SBBCE_LOGO_NEW_AI_SD.png",BBC EARTH
 http://202.70.146.135:8000/play/a067/index.m3u8
 #EXTINF:-1 tvg-logo="https://images.toffeelive.com/images/program/18097/logo/240x240/mobile_logo_297723001673195119.png"  group-title="Documentary",Discovery Bangla
 http://202.70.146.135:8000/play/a05z/index.m3u8
