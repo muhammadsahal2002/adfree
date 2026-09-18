@@ -3,7 +3,7 @@
 https://live20.bozztv.com/giatvplayout7/giatv-209869/tracks-v1a1/mono.ts.m3u8
 #EXTINF:-1 tvg-logo="https://otapp.store/uploads/tv_image/sm/cartoon-network-hindi.png"  group-title="Kids",Cartoon Network
 https://vodzong.mjunoon.tv:8087/streamtest/cartoon-network-87/playlist.m3u8
-#EXTINF:-1 tvg-logo="https://thumb.wikimedia.org/wikipedia/en/thumb/5/5c/Tiny_Pop_logo_2018.svg/960px-Tiny_Pop_logo_2018.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail"  group-title="kids",Tiny pop
+#EXTINF:-1 tvg-logo="https://thumb.wikimedia.org/wikipedia/en/thumb/5/5c/Tiny_Pop_logo_2018.svg/960px-Tiny_Pop_logo_2018.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail"  group-title="Kids",Tiny pop
 https://amg01753-narrativeuk-amg01753c1-rakuten-uk-2339.playouts.now.amagi.tv/480p/index.m3u8
 #EXTINF:-1 tvg-logo="https://upload.wikimedia.org/wikipedia/en/b/bd/Doraemon_character.png"  group-title="Kids",Doraemon
 https://live20.bozztv.com/giatvplayout7/giatv-209902/tracks-v1a1/mono.ts.m3u8
@@ -28,7 +28,7 @@ http://202.70.146.135:8000/play/a02t/index.m3u8
 #EXTINF:-1 tvg-logo="https://otapp.store/uploads/tv_image/sm/sonic-bangla.png"  group-title="Kids",Sonic Bangla
 http://live.balajibroadband.com:3500/live/1345.m3u8
 #EXTINF:-1 tvg-logo="https://sonypicturesnetworks.com/images/logos/SONY%20YAY.png"  group-title="Kids",Sony Yay
-http://live.balajibroadband.com:3500/live/872.m3u8
+https://drk6xq0vhn.gpcdn.net/live/sony_yay_abr/index.m3u8
 #EXTINF:-1 tvg-id="StarJalsha.in@HD" tvg-logo="https://i.imgur.com/IlufzR5.png"  group-title="Entertainment",Star Jalsha HD
 https://da86m1sqpm3o0.cloudfront.net/28072023/smil:starjalsha.smil/chunklist_b1928000.m3u8
 #EXTINF:-1 tvg-logo="https://xstreamcp-assets-msp.streamready.in/assets/LIVETV/LIVECHANNEL/LIVETV_LIVETVCHANNEL_ZEE_BANGLA/images/LOGO_HD/LOGO_HD_image.png"  group-title="Entertainment",Zee Bangla
